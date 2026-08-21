@@ -46,3 +46,7 @@ $RECYCLE.BIN/
 **/__pycache__/
 **/.venv/
 **/venv/
+
+# Rendered data plan records (org-specific IDs templated in at load time —
+# see data/scripts/load-data.sh)
+data/records/.generated/

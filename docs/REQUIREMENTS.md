@@ -10,9 +10,9 @@ mechanics, agent configuration steps), see [`SETUP_GUIDE.md`](./SETUP_GUIDE.md).
 - **Audience**: [CodeWithSally](https://www.youtube.com/@CodeWithSally) YouTube channel.
 - **Presenter role**: Developer, building live with Cursor and Claude Code.
 - **Environments**:
-  | Org alias | Purpose |
-  |---|---|
-  | `sally-prep` | SDO sandbox used to build, test, and rehearse everything before the recording. |
+  | Org alias    | Purpose                                                                                                                         |
+  | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+  | `sally-prep` | SDO sandbox used to build, test, and rehearse everything before the recording.                                                  |
   | `sally-demo` | SDO sandbox used for the live recording. Built **from scratch** during the demo, following what was proven out in `sally-prep`. |
 - **Source control**: [git@github.com:dangt85/sally-afv.git](https://github.com/dangt85/sally-afv)
 
@@ -84,37 +84,37 @@ article publishing).
 A small catalog (~8 products) across categories that plausibly need documentation —
 tents, packs, stoves, filters, sleeping bags, headlamps, boots, camp furniture. Each
 product must have at least one PDF (manual, troubleshooting guide, or how-to) attached
-as a `ContentVersion` linked to the `Product2` record (so the agent/Data360 data graph
-has real content to ground answers in).
+as a `ContentVersion` linked to the `Product2` record (so the agent's Apex
+vector-search retriever has real content to ground answers in).
 
-| Product | SKU | Linked content |
-|---|---|---|
-| Alpine Peak 2 Tent | `TENT-AP2` | Setup manual; "leaking seams / broken pole" troubleshooting |
-| Summit Trail 65 Backpack | `PACK-ST65` | Fitting & adjustment guide |
-| BlazeLight Camp Stove | `STOVE-BL1` | Manual; "won't ignite" troubleshooting |
-| StreamPure Water Filter | `FILTER-SP3` | Manual; cleaning/backwashing how-to |
-| Frostguard 20 Sleeping Bag | `BAG-FG20` | Care guide (washing/storage) |
-| TrailBeam 500 Headlamp | `LAMP-TB500` | Manual; charging troubleshooting |
-| Ridgeline Hiking Boots | `BOOT-RL7` | Sizing guide; waterproofing how-to |
-| BaseCamp Quad Chair | `CHAIR-BC4` | Assembly guide |
+| Product                    | SKU          | Linked content                                              |
+| -------------------------- | ------------ | ----------------------------------------------------------- |
+| Alpine Peak 2 Tent         | `TENT-AP2`   | Setup manual; "leaking seams / broken pole" troubleshooting |
+| Summit Trail 65 Backpack   | `PACK-ST65`  | Fitting & adjustment guide                                  |
+| BlazeLight Camp Stove      | `STOVE-BL1`  | Manual; "won't ignite" troubleshooting                      |
+| StreamPure Water Filter    | `FILTER-SP3` | Manual; cleaning/backwashing how-to                         |
+| Frostguard 20 Sleeping Bag | `BAG-FG20`   | Care guide (washing/storage)                                |
+| TrailBeam 500 Headlamp     | `LAMP-TB500` | Manual; charging troubleshooting                            |
+| Ridgeline Hiking Boots     | `BOOT-RL7`   | Sizing guide; waterproofing how-to                          |
+| BaseCamp Quad Chair        | `CHAIR-BC4`  | Assembly guide                                              |
 
 ### 3.2 Customers (Person Accounts)
 
 Roughly 6 fictitious customers modeled as **Person Accounts**, deliberately mixing
 English- and Spanish-preferring customers to mirror the two-queue reality:
 
-| Name | Preferred language | Location |
-|---|---|---|
-| Maria Alvarez | Spanish | Austin, TX |
-| James Whitfield | English | Portland, OR |
-| Linh Tran | English | Seattle, WA |
-| Carlos Mendoza | Spanish | Miami, FL |
-| Emily Carter | English | Denver, CO |
-| Sofia Reyes | Spanish | Phoenix, AZ |
+| Name            | Preferred language | Location     |
+| --------------- | ------------------ | ------------ |
+| Maria Alvarez   | Spanish            | Austin, TX   |
+| James Whitfield | English            | Portland, OR |
+| Linh Tran       | English            | Seattle, WA  |
+| Carlos Mendoza  | Spanish            | Miami, FL    |
+| Emily Carter    | English            | Denver, CO   |
+| Sofia Reyes     | Spanish            | Phoenix, AZ  |
 
 ### 3.3 Orders & Order Items
 
-Each customer has 1–3 `Order` records, each with 2–4 `OrderItem` line items (multiple
+Each customer has 10–20 `Order` records, each with 2–4 `OrderItem` line items (multiple
 products per order, multiple orders per customer). Orders carry a realistic mix of
 statuses (e.g., Processing, In Transit, Delivered) with an order number, total, and
 estimated delivery date, since those are exactly the fields the agent must be able to
@@ -143,32 +143,62 @@ The Agentforce Voice agent must support the following:
 
 1. **Order lookup** — Given identifying information from the caller, look up a
    standard `Order` and report back order number, total, status, and estimated
-   delivery date.
+   delivery date. (Grounding/retrieval approach: §5.1.)
 2. **Company FAQs** — Answer frequently asked questions about Cairn Outdoor Co.
    (returns, shipping, warranty, price match, loyalty, store hours) grounded in the
-   Knowledge articles above.
+   Knowledge articles above. (Grounding/retrieval approach: §5.2.)
 3. **Product Q&A** — Answer questions about products (specs, compatibility,
    troubleshooting, how-tos) grounded in the linked PDF manuals/guides, not just
-   free-form generation.
+   free-form generation. (Grounding/retrieval approach: §5.3.)
 4. **Escalation to a human agent** — If a question can't be answered by the agent,
    escalate the live call to a human agent in the appropriate Amazon Connect queue
    (English or Spanish).
-5. **Case creation as a fallback** — If a question can't be answered *and* no human
+5. **Case creation as a fallback** — If a question can't be answered _and_ no human
    agent is available to escalate to, create a `Case` capturing the caller's issue so
    a human can follow up later.
 
-## 5. Product Q&A: Grounding Approach
+## 5. Grounding & Retrieval Approaches
 
-Two approaches are in scope; the primary is the intended showcase, the alternate is a
-fallback / comparison point.
+Order lookup and company FAQ are each built in stages of increasing sophistication,
+so the demo shows _why_ each upgrade matters, not just the final state. Product Q&A
+ships as a single approach.
 
-- **Primary — Data360 Data Graph**: use a Data Cloud (Data360) data graph over the
-  product catalog and linked manual content so the agent's product answers are
-  grounded in structured + unstructured product data.
-- **Alternate — Custom Apex retriever**: a custom Apex action performing vector
-  search over the product content directly (bypassing Data Cloud) to reduce latency.
-  Useful if Data360 setup/latency becomes a demo risk, or as a "here's another way to
-  do this" comparison segment.
+### 5.1 Order Lookup
+
+1. **Flow** — a declarative Flow action looks up `Order`/`OrderItem` by
+   customer-provided identifiers. Fastest path to a working `order_lookup` topic.
+2. **Apex (local SOQL)** — the Flow action is replaced by an Apex action running the
+   equivalent SOQL query directly against Salesforce.
+3. **Data360 Data Graph** — the Apex action is replaced by a Data Cloud data graph
+   built over Account/Order/OrderItem/Product2 data ingested from Salesforce CRM.
+   This is the only place in the demo a data graph is used — the structured,
+   multi-object shape of an order (customer + line items + products) is what a data
+   graph is suited for. Reaching this stage requires a preparation step: ingest the
+   CRM data into Data Cloud and manually map it to Data Cloud's Standard Data Model
+   (e.g. Individual, Sales Order, Sales Order Product, Product) — deliberately **not**
+   using Data Cloud's built-in Salesforce CRM connector/data kit, so the ingestion and
+   mapping mechanics are visible on camera — before building the data graph on top of
+   the mapped objects. The data graph is then added as a native Data Cloud retriever
+   action directly on the `order_lookup` topic; no additional Apex/Flow is needed to
+   invoke it.
+
+### 5.2 Company FAQ
+
+1. **Prompt Template + Data Cloud retriever** — a Prompt Template action with a
+   built-in Data Cloud/Knowledge retriever, grounded on the Knowledge articles in
+   §3.4.
+2. **Custom Apex vector-search retriever** — the Prompt Template's retriever call is
+   replaced by a custom Apex action that queries Data Cloud's vector search index
+   directly, skipping the Prompt Template retriever's orchestration overhead.
+   Demonstrated as a "here's what's happening under the hood, and why it's faster"
+   comparison segment.
+
+### 5.3 Product Q&A
+
+**Custom Apex vector-search retriever** — a single approach: a custom Apex action
+queries Data Cloud's vector search index directly over the product catalog's linked
+manual/how-to content (§3.1), grounding answers in the actual PDF content rather than
+free-form generation. No data graph is used for this use case.
 
 ## 6. Voice Channel: Telephony Approach
 
@@ -198,8 +228,8 @@ The demo is successful if, live in `sally-demo`, built from scratch on camera:
 - [ ] A caller can ask a company FAQ (e.g., return policy) and get a correct,
       Knowledge-grounded answer.
 - [ ] A caller can ask a product question (e.g., "how do I clean my water filter?")
-      and get an answer grounded in the actual linked manual, via the Data360 data
-      graph.
+      and get an answer grounded in the actual linked manual, via the Apex
+      vector-search retriever.
 - [ ] A caller can ask something the agent can't answer and be escalated live into
       the correct Amazon Connect queue.
 - [ ] A caller can ask something unanswerable while no human agent is available and

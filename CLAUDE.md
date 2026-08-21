@@ -30,8 +30,14 @@ explicitly, never rely on a default:
   Data Loader or manual UI entry — see `docs/SETUP_GUIDE.md` §4 for the specific
   ordering/gotchas (standard Pricebook id, ContentVersion linking, Knowledge
   publishing).
-- Product Q&A grounding: primarily a Data360 (Data Cloud) data graph; a custom Apex
-  vector-search retriever is the documented low-latency alternate.
+- Order lookup grounding: staged build (Flow → Apex/SOQL → Data360 data graph) — the
+  only place a Data Cloud data graph is used, backed by CRM data ingested and
+  manually mapped to Data Cloud's Standard Data Model rather than the built-in
+  Salesforce CRM connector/data kit. See `docs/REQUIREMENTS.md` §5.1.
+- Company FAQ and Product Q&A grounding: both use a custom Apex vector-search
+  retriever querying Data Cloud's vector search index directly (no data graph); FAQ
+  additionally has a Prompt Template + Data Cloud retriever baseline stage it
+  upgrades from, for a latency comparison. See `docs/REQUIREMENTS.md` §5.2–§5.3.
 - Voice: Amazon Connect + Salesforce Service Cloud Voice is the primary/current-state
   integration; Agentforce Contact Center (AFCC) is the documented alternate.
 

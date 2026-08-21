@@ -13,7 +13,8 @@ It's written as a run-of-show: build and rehearse everything here against
 - **Person Accounts** enabled in both orgs (this cannot be toggled via CLI/metadata —
   confirm with `sf org display --target-org <alias>` / Setup → Account Settings
   before relying on it; request enablement ahead of time if it's missing).
-- **Data Cloud (Data360)** provisioned in both orgs, for the data graph use case.
+- **Data Cloud (Data360)** provisioned in both orgs — for the order lookup data graph
+  and for the vector search index backing the FAQ/Product Q&A Apex retrievers.
 - **Amazon Connect** instance connected to both orgs via **Salesforce Service Cloud
   Voice**, with the two existing queues (`Cairn Support – English`,
   `Cairn Support – Spanish`) already configured — this is the "current state" the
@@ -46,7 +47,9 @@ docs/
   SETUP_GUIDE.md
 ```
 
-(`data/` doesn't exist yet — it gets created when the sample data is built out.)
+`data/plans/` and `data/records/` are checked into git; `data/records/.generated/`
+holds record files with org-specific IDs (Standard Pricebook, Person Account record
+type) templated in at load time, and is git-ignored — see §4.1 step 3 and §4.2.
 
 ## 3. Deploying Metadata
 
@@ -56,6 +59,15 @@ sf project deploy start --target-org sally-prep
 
 Repeat against `sally-demo` during the live build.
 
+New custom fields deploy with **no field-level security** granted to any profile, so
+the data load will fail with an `FlsError` until the user running it can write to
+them. Assign the `Cairn_Data_Load` permission set (deployed above) to that user once,
+per org:
+
+```bash
+sf org assign permset --target-org sally-prep --name Cairn_Data_Load
+```
+
 ## 4. Loading Sample Data
 
 The data plan follows Salesforce's **SObject Tree Save API** format
@@ -63,6 +75,28 @@ The data plan follows Salesforce's **SObject Tree Save API** format
 `REQUIREMENTS.md` §3. A few objects don't fit a plain tree import cleanly — read this
 section fully before building the plan files, since it drives how they need to be
 laid out.
+
+**Schema this plan depends on, beyond stock Product2/Account/Order/OrderItem:**
+
+- `Order.Fulfillment_Status__c` (picklist: Processing / In Transit / Delivered /
+  Cancelled) and `Order.Estimated_Delivery_Date__c` (date) — custom fields, deployed
+  with the metadata (`force-app/main/default/objects/Order/fields/`). The agent
+  reports `Fulfillment_Status__c` as "status," not the standard `Status` field, which
+  every seed order leaves at `Activated` (required for the order to carry
+  `OrderItem`s and roll up `TotalAmount`).
+- `Account.Preferred_Language__c` (picklist: English / Spanish) — custom field on the
+  Person Account, also deployed with the metadata
+  (`force-app/main/default/objects/Account/fields/`).
+- Knowledge Articles load into `Knowledge__kav` — the **default** Article Type
+  Salesforce Knowledge creates automatically when the feature is enabled, not a
+  custom one we defined. Our `sally-prep`/`sally-demo` org template happens to seed
+  it with `FAQ_Question__c`, `FAQ_Answer__c`, and `Chat_Answer__c` fields, which the
+  Knowledge article records in step 6 below populate (`Chat_Answer__c` as the short,
+  voice-friendly response; `FAQ_Answer__c` as the fuller version). If a fresh org's
+  `Knowledge__kav` doesn't have those fields, either add them or repoint
+  `data/records/knowledge-articles.json` / `data/plans/03-knowledge-plan.json` at
+  whatever article type + fields that org actually has — confirm with
+  `sf sobject describe --sobject Knowledge__kav --target-org <alias>` before loading.
 
 ### 4.1 Load order & why
 
@@ -80,27 +114,47 @@ laid out.
    ```bash
    PB_ID=$(sf data query --target-org <alias> \
      --query "SELECT Id FROM Pricebook2 WHERE IsStandard=true" --json \
-     | jq -r '.result.records[0].Id')
+     | python3 -c "import json,sys; print(json.load(sys.stdin)['result']['records'][0]['Id'])")
    sf data update record --target-org <alias> \
      --sobject Pricebook2 --record-id "$PB_ID" --values "IsActive=true"
    ```
    Then template `$PB_ID` into the PricebookEntry record file (e.g. via `envsubst` on
    a `.json.tpl` with a `${STANDARD_PRICEBOOK_ID}` placeholder) before running the
    plan that creates the `PricebookEntry` records (referencing `@ProductRefN` for
-   `Product2Id`, and the resolved literal id for `Pricebook2Id`).
-4. **Person Accounts** — plain tree records.
-5. **Orders + OrderItems** — in the same plan run as Person Accounts, so `Order`
-   records can reference `@PersonAccountRefN` for `AccountId`; `OrderItem` records
-   nest under their parent `Order` and reference the `PricebookEntry` ids resolved in
-   step 3 (literal ids, since those weren't created via tree ref in this run — either
-   look them up with `sf data query` right before generating this file, or keep
-   PricebookEntries in the *same* overall plan run so they can also be referenced by
-   `@PricebookEntryRefN`).
-6. **Knowledge Articles** — load as Draft via tree import, then **publish**
-   separately; publishing is a workflow action, not a plain field update, so it needs
-   either a small Apex snippet using `KbManagement.PublishingService.publishArticle`
-   run via `sf apex run --file`, or a manual publish pass in Setup. Author English and
-   Spanish variants where practical, matching the two support queues.
+   `Product2Id`, and the resolved literal id for `Pricebook2Id`) —
+   `data/plans/01-products-plan.json`. `Order` also requires a literal
+   `Pricebook2Id`, so `orders-*.json.tpl` carries the same
+   `${STANDARD_PRICEBOOK_ID}` placeholder.
+4. **Person Accounts** — the Person Account record type `Id` is org-specific too, so
+   `person-accounts.json.tpl` templates a `${PERSON_ACCOUNT_RECORD_TYPE_ID}`
+   placeholder, resolved the same way by querying `RecordType` where
+   `SObjectType = 'Account' AND IsPersonType = true`.
+5. **Orders + OrderItems** — Accounts and Orders load together via
+   `data/plans/02-customers-orders-plan.json`, so `Order.AccountId` can reference
+   `@PersonAccountRefN` — a top-level field, which `@Ref` resolution handles fine
+   across plan entries. `OrderItem.PricebookEntryId` can't work the same way: `@Ref`
+   tokens only resolve on top-level record fields, not on fields nested inside a
+   child relationship (`Order.OrderItems[].PricebookEntryId`) — confirmed against
+   `sally-prep` (`MALFORMED_ID` on every `@PricebookEntryRefN`). So PricebookEntries
+   load in the earlier, separate `01-products-plan.json` run, `load-data.sh` queries
+   their real Ids by `Product2.ProductCode` right after, and `orders-*.json.tpl`
+   carries `${PRICEBOOK_ENTRY_ID_<SKU>}` placeholders instead of `@Ref`s. Two more
+   gotchas surfaced testing this against `sally-prep`: `Order.Status` can't be
+   inserted as `Activated` — the API rejects it (`FAILED_ACTIVATION`) — so every seed
+   order loads as `Draft` and `load-data.sh` flips it to `Activated` afterward with
+   `activate-orders.apex`, scoped to accounts that have `Preferred_Language__c` set
+   so it can never touch unrelated Draft orders already in the org; and
+   `OrderItem.TotalPrice` is system-calculated, so it's omitted from the record data
+   entirely rather than set. Orders are also split across
+   `orders-01.json.tpl`/`-02`/`-03` (regenerate via `data/scripts/generate-orders.py`)
+   because a single Order + its nested OrderItems all count against the SObject Tree
+   Save API's 200-records-per-request cap.
+6. **Knowledge Articles** (`Knowledge__kav`) — load as Draft via tree import
+   (`data/plans/03-knowledge-plan.json`), then **publish** separately with
+   `data/scripts/publish-knowledge-articles.apex` (uses
+   `KbManagement.PublishingService.publishArticle`, run via `sf apex run --file`) —
+   publishing is a workflow action, not a plain field update. Authored in English and
+   Spanish, matching the two support queues.
 
 ### 4.2 Running it
 
@@ -120,11 +174,13 @@ Author the agent as an **Agent Script** (`AiAuthoringBundle`), matching the five
 cases in `REQUIREMENTS.md` §4 — one topic/subagent per use case is a reasonable
 starting split:
 
-- `order_lookup` — Apex/Flow action querying `Order`/`OrderItem` by customer-provided
-  identifiers, returns order number, total, status, estimated delivery date.
-- `company_faq` — Knowledge retrieval grounded in the articles loaded in §4.1 step 6.
-- `product_qa` — grounded in the Data360 data graph (§6) or the Apex retriever
-  alternate.
+- `order_lookup` — staged build from Flow → Apex (SOQL) → Data360 data graph; see
+  §6.1. Returns order number, total, status, estimated delivery date.
+- `company_faq` — staged build from Prompt Template + Data Cloud retriever → custom
+  Apex vector-search retriever; see §6.2. Grounded in the Knowledge articles loaded
+  in §4.1 step 6.
+- `product_qa` — custom Apex vector-search retriever over linked product manuals; see
+  §6.3.
 - `escalate_to_agent` — transfers the live Voice call into the correct Amazon Connect
   queue (English/Spanish) based on the caller's language.
 - `create_case` — invoked when `escalate_to_agent` isn't possible (no agent
@@ -133,30 +189,62 @@ starting split:
 Preview each topic in simulated mode in VS Code (`AFDX: Preview This Agent`) before
 wiring up real data, then switch to live mode once Apex/Flow/data are deployed.
 
-## 6. Product Q&A Grounding
+## 6. Grounding & Retrieval Build
 
-### 6.1 Primary: Data360 Data Graph
+### 6.1 Order Lookup
 
-Build a Data Cloud data graph over the `Product2` records and their linked
-`ContentVersion` manuals/guides, and wire it into the `product_qa` topic as a
-retrieval action — a data graph that lets the agent answer product-specific
-questions grounded in real product content rather than free-form generation.
+Build in stages against `sally-prep`; each stage should work end-to-end before
+moving to the next.
 
-What "good" looks like here is a clear before/after: without the data graph, the
-agent gives a generic answer and asks the caller for details it should already be
-able to look up. With the data graph, one retrieval call assembles product spec,
-manual, and troubleshooting content in place of several manual lookups, and the
-agent answers already grounded in the specific product — citing the actual spec or
-troubleshooting step rather than a generic response. That contrast (generic vs.
-grounded, multiple lookups vs. one call) is worth making visible on camera, not just
-the final grounded answer.
+1. **Flow** — declarative Flow action querying `Order`/`OrderItem` by
+   customer-provided identifiers (order number, customer name/phone/email). Wire it
+   into the `order_lookup` topic as the first working version.
+2. **Apex (local SOQL)** — swap the Flow action for an Apex invocable action running
+   the equivalent SOQL query. Same inputs/outputs as stage 1, so the topic wiring
+   doesn't change, only the action implementation.
+3. **Data360 Data Graph** — replace the Apex action with a Data Cloud data graph, in
+   three steps:
+   1. **Ingest & map** — configure Data Cloud ingestion (Data Stream) from Salesforce
+      CRM for `Account` (Person Account), `Order`, `OrderItem`, and `Product2`, using
+      the standard Salesforce Data Cloud connector for streaming ingestion. Skip the
+      pre-built "Sales and Service Cloud" data kit's automatic mapping — manually map
+      the ingested fields to Data Cloud's Standard Data Model objects (e.g.
+      `Individual`, `Sales Order`, `Sales Order Product`, `Product`) in the Data Cloud
+      Data Model canvas, so the mapping decisions are visible on camera rather than
+      hidden behind the kit's defaults. Confirm the exact standard object/field names
+      available in the org's Data Model canvas before mapping — Data Cloud's Standard
+      Data Model can vary slightly by org/release.
+   2. **Build the data graph** — build a data graph over the mapped standard objects,
+      keyed for lookup by order number and customer identifier, so a single query
+      returns the order, its line items, the customer, and the ordered products.
+   3. **Wire it up** — add the data graph as a native Data Cloud retriever action
+      directly on the `order_lookup` topic in Agent Builder (the same mechanism used
+      for `product_qa` in §6.3). No additional Apex/Flow is needed to invoke it — Data
+      Cloud resolves the query from the action's input parameters.
 
-### 6.2 Alternate: Custom Apex Retriever
+### 6.2 Company FAQ
 
-If Data360 setup time or query latency becomes a risk for the live segment, fall back
-to (or additionally demo) a custom Apex action that performs vector search directly
-over the product content — lower latency, fully custom, good talking point on "here's
-what's happening under the hood" vs. the managed Data360 path.
+1. **Prompt Template + Data Cloud retriever** — a Prompt Template action with a
+   built-in Data Cloud/Knowledge retriever grounded on the Knowledge articles
+   published in §4.1 step 6. Baseline version of `company_faq`.
+2. **Custom Apex vector-search retriever** — replace the Prompt Template's retriever
+   call with a custom Apex action that queries Data Cloud's vector search index
+   directly over the Knowledge article content, skipping the Prompt Template
+   retriever's orchestration overhead. Demo this as a before/after latency comparison
+   against stage 1.
+
+### 6.3 Product Q&A
+
+A custom Apex action queries Data Cloud's vector search index directly over the
+`Product2` records' linked `ContentVersion` manuals/guides — no data graph, no Prompt
+Template retriever, single approach.
+
+What "good" looks like here is a clear before/after: without grounding, the agent
+gives a generic answer and asks the caller for details it should already be able to
+look up. With the retriever wired in, the agent answers already grounded in the
+specific product — citing the actual spec or troubleshooting step rather than a
+generic response. That contrast is worth making visible on camera, not just the
+final grounded answer.
 
 ## 7. Voice Channel Setup
 
@@ -180,8 +268,12 @@ as the "native CCaaS" story for orgs not already invested in Amazon Connect.
 - [ ] Metadata deploys clean to a fresh sandbox.
 - [ ] `data/scripts/load-data.sh sally-prep` runs end-to-end with no manual fixups.
 - [ ] All five use cases pass manual QA in the Agentforce DX preview panel.
-- [ ] Data360 data graph returns grounded answers for at least 2–3 product questions
-      per product category worth demoing.
+- [ ] Order lookup data graph returns the correct order, line items, and
+      customer/product details for at least 2–3 sample orders.
+- [ ] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
+      questions per product category worth demoing.
+- [ ] Company FAQ Apex retriever returns grounded answers at lower latency than the
+      Prompt Template baseline for at least 2–3 sample questions.
 - [ ] Escalation actually rings into the correct Amazon Connect queue.
 - [ ] Case creation fires correctly when escalation isn't available (simulate no
       agents available).
@@ -193,9 +285,10 @@ Repeat, from a clean sandbox, on camera:
 
 1. `sf org login web --alias sally-demo` (if not already authorized).
 2. `sf project deploy start --target-org sally-demo`.
-3. `data/scripts/load-data.sh sally-demo`.
-4. Walk through agent build/config live (per §5–7), narrating for the audience.
-5. Live call demo covering the use cases in `REQUIREMENTS.md` §8 success criteria.
+3. `sf org assign permset --target-org sally-demo --name Cairn_Data_Load` (§3).
+4. `data/scripts/load-data.sh sally-demo`.
+5. Walk through agent build/config live (per §5–7), narrating for the audience.
+6. Live call demo covering the use cases in `REQUIREMENTS.md` §8 success criteria.
 
 ## 10. Known Gotchas
 
@@ -208,6 +301,37 @@ Repeat, from a clean sandbox, on camera:
   in agent retrieval until published.
 - Person Accounts can't be enabled via CLI/metadata — verify it's on before building
   anything that depends on it.
+- Knowledge Articles load into `Knowledge__kav`, Salesforce's default Article Type —
+  its `FAQ_Question__c`/`FAQ_Answer__c`/`Chat_Answer__c` fields come from the org
+  template, not from `force-app`; re-check field names with `sf sobject describe` on
+  any org that wasn't built from the same template (see §4).
+- Some org templates (ours included) seed more than one `IsPersonType = true`
+  Account record type. `load-data.sh` prefers the one named `PersonAccount`; if a
+  target org doesn't have that exact `DeveloperName`, it falls back to whichever
+  Person Account record type sorts first — check that's the intended one.
+- Person Account and PricebookEntry record type/pricebook `Id`s are resolved live by
+  `data/scripts/load-data.sh`, which writes rendered files to the git-ignored
+  `data/records/.generated/`. Run the script rather than `sf data import tree`
+  directly against the `.tpl` files — they contain unresolved `${...}` placeholders.
+- `OrderItem.TotalPrice` is system-calculated from `Quantity` × `UnitPrice` — the API
+  rejects it on insert (`INVALID_FIELD_FOR_INSERT_UPDATE`), so it's omitted from
+  `orders-*.json.tpl` and left for the platform to compute (`Order.TotalAmount` then
+  rolls up from that automatically).
+- `load-data.sh` is **not idempotent** — every object it inserts (Products,
+  ContentVersions, PricebookEntries, Person Accounts, Orders, Knowledge articles) is
+  a plain `sf data import tree`/create, with no upsert or dedup. Re-running it against
+  an org that already has this sample data creates a second set of everything.
+  Clean up first (e.g. delete `Product2` by the SKUs in `REQUIREMENTS.md` §3.1,
+  cascading to their `PricebookEntry`/`ContentDocument`, plus the 6 Person Accounts by
+  `Preferred_Language__c != null`, which cascades to their Orders/OrderItems) before
+  reloading into a non-empty `sally-prep`.
+- Data Cloud ingestion is streaming, not instant — allow a few minutes after loading
+  sample data before the order lookup data graph reflects it; don't assume it's
+  broken if a freshly loaded order doesn't show up immediately.
+- The Salesforce CRM data kit's automatic mapping is intentionally skipped for order
+  lookup — `Account`/`Order`/`OrderItem`/`Product2` fields are mapped to Data Cloud's
+  Standard Data Model by hand (§6.1) — double-check the mapping after any Data Cloud
+  org refresh/reset.
 
 ## 11. References
 
