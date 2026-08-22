@@ -56,11 +56,26 @@ variables:
         description: "Whether a live specialist is expected to be reachable. Set to False on entry to create_case, since create_case is only ever reached when a live transfer didn't connect."
     caller_issue_summary: mutable string = ""
         description: "Short summary of the caller's unresolved issue, collected by create_case and passed along to case creation."
+    VoiceCallId: linked string
+        source: @VoiceCall.Id
+        description: "This variable may also be referred to as Voice Call Id"
+
+connection messaging:
+    escalation_message: "Connecting you to a specialist now — one moment."
+
+connection customer_web_client:
+    adaptive_response_allowed: True
 
 language:
     default_locale: "en_US"
     additional_locales: ""
     all_additional_locales: False
+
+modality voice:
+    voice_id: "UgBBYS2sOqTuMpoF3BR0"
+    outbound_speed: 1
+    outbound_stability: 0.65
+    outbound_similarity: 0.75
 
 start_agent agent_router:
     label: "Agent Router"
