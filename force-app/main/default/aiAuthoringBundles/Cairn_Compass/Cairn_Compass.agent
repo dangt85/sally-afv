@@ -117,11 +117,6 @@ start_agent agent_router:
 subagent order_lookup:
     label: "Order Lookup"
     description: "Handles order status, returns, and cancellation questions about an existing order."
-    # PLACEHOLDER: order_lookup_action will bind to the Cairn_Order_Lookup
-    # Flow in a later build task (inputs: caller-provided identifiers;
-    # outputs: order number, total, fulfillment status, estimated delivery
-    # date). Not implemented yet — this subagent hands off rather than
-    # fabricating a result.
 
     before_reasoning:
         set @variables.queue_target = "Orders_Returns"
@@ -133,19 +128,59 @@ subagent order_lookup:
             Collect either the order number, or the caller's full name plus a
             phone number or email — whichever is fastest for the caller to
             give you. Don't ask for both if one is enough.
-            Automatic order lookup isn't available in this build yet. Once
-            you have the caller's identifiers, don't state an order number,
-            total, status, or delivery date — you don't actually have one to
-            report. Instead let the caller know you're not able to pull that
-            up automatically right now and that you'll get them to someone
-            who can, then hand them off.
+            Once you have enough to identify the order, call look_up_order.
+            Say something short while it runs, since it isn't instant.
+            If it finds an order, lead with the answer: report the order
+            number, total, fulfillment status, and estimated delivery date in
+            one short, natural sentence — don't read it back as a list of
+            fields.
+            If it doesn't find a matching order, apologize briefly, let the
+            caller know you'll get them to someone who can look further into
+            it, then hand them off.
             If the caller wants something self-service can't do (like
             changing or cancelling an order), hand them off the same way once
-            you've got their identifiers.
+            you've looked up the order.
 
         actions:
+            look_up_order: @actions.order_lookup_action
+                description: "Look up an order by order number, or by the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+                with OrderNumberInput = ...
+                with CustomerNameInput = ...
+                with CustomerPhoneInput = ...
+                with CustomerEmailInput = ...
             hand_off_to_specialist: @utils.transition to @subagent.escalate_to_agent
-                description: "Connect the caller with an orders and returns specialist once you have their identifiers and can't resolve the request yourself."
+                description: "Connect the caller with an orders and returns specialist once you have their identifiers and can't resolve the request yourself, or when look_up_order can't find a matching order."
+
+    actions:
+        order_lookup_action:
+            description: "Look up an order by order number, or by the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+            target: "flow://Cairn_Order_Lookup"
+            inputs:
+                OrderNumberInput: string
+                    description: "The order number, if the caller gave one."
+                CustomerNameInput: string
+                    description: "The caller's full name — pair with a phone number or email to find their order."
+                CustomerPhoneInput: string
+                    description: "The caller's phone number — pair with their name to find their order."
+                CustomerEmailInput: string
+                    description: "The caller's email address — pair with their name to find their order."
+            outputs:
+                OrderFound: boolean
+                    description: "Whether a matching order was found."
+                    is_displayable: True
+                OrderNumberOutput: string
+                    description: "The order's number."
+                    is_displayable: True
+                TotalAmountOutput: object
+                    complex_data_type_name: "lightning__currencyType"
+                    description: "The order's total amount."
+                    is_displayable: True
+                FulfillmentStatusOutput: string
+                    description: "The order's fulfillment status."
+                    is_displayable: True
+                EstimatedDeliveryDateOutput: date
+                    description: "The order's estimated delivery date."
+                    is_displayable: True
 
 subagent company_faq:
     label: "Company FAQ"
@@ -222,10 +257,6 @@ subagent escalate_to_agent:
 subagent create_case:
     label: "Create Case"
     description: "Logs a case for the caller's issue when a live specialist wasn't reachable. Reached only as a hand-off from escalate_to_agent."
-    # PLACEHOLDER: create_case_action will bind to the Cairn_Create_Case Flow
-    # in a later build task (inputs: caller identity + caller_issue_summary;
-    # outputs: case number). Not implemented yet — see the caller-facing note
-    # below about not fabricating a case number.
 
     before_reasoning:
         set @variables.human_agent_available = False
@@ -236,15 +267,45 @@ subagent create_case:
             short summary of the caller's issue in one or two sentences, then
             read it back to the caller in a single sentence to confirm you
             got it right before doing anything else.
-            Once confirmed, since case creation isn't wired up in this build
-            yet, let the caller know their issue has been logged and that
-            someone from the team will follow up with them soon — don't state
-            a specific case number, since you don't have a real one to give.
+            You'll also need the caller's name to log the case — ask for it
+            if you don't already have it from earlier in the call. A phone
+            number or email is helpful too, but don't hold up case creation
+            waiting on one if the caller doesn't have it handy.
+            Once the summary is confirmed and you have the caller's name,
+            create the case, then read the case number back to the caller in
+            one short sentence so they have it for reference.
 
         actions:
             capture_issue_summary: @utils.setVariables
                 description: "Capture a short summary of the caller's issue once they've described it."
                 with caller_issue_summary = ...
+            log_case: @actions.create_case_action
+                description: "Create a case with the caller's name, phone or email, and issue summary, once the summary is confirmed. Returns the case number."
+                with CallerNameInput = ...
+                with CallerPhoneInput = ...
+                with CallerEmailInput = ...
+                with IssueSummaryInput = @variables.caller_issue_summary
+                available when @variables.caller_issue_summary != ""
+
+    actions:
+        create_case_action:
+            description: "Create a case for the caller's issue with their name, a phone number or email, and a short summary. Returns the case number."
+            target: "flow://Cairn_Create_Case"
+            inputs:
+                CallerNameInput: string
+                    description: "The caller's full name."
+                    is_required: True
+                CallerPhoneInput: string
+                    description: "The caller's phone number, if given."
+                CallerEmailInput: string
+                    description: "The caller's email address, if given."
+                IssueSummaryInput: string
+                    description: "A short summary of the caller's issue."
+                    is_required: True
+            outputs:
+                CaseNumberOutput: string
+                    description: "The number of the case that was created."
+                    is_displayable: True
 
 subagent off_topic:
     label: "Off Topic"
