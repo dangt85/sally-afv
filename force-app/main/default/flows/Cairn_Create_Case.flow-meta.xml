@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>67.0</apiVersion>
+    <formulas>
+        <name>TruncatedSubject</name>
+        <dataType>String</dataType>
+        <expression>LEFT({!IssueSummaryInput}, 255)</expression>
+    </formulas>
     <assignments>
         <name>Assign_Case_Number</name>
         <label>Assign Case Number</label>
@@ -53,7 +58,7 @@
         <inputAssignments>
             <field>Subject</field>
             <value>
-                <elementReference>IssueSummaryInput</elementReference>
+                <elementReference>TruncatedSubject</elementReference>
             </value>
         </inputAssignments>
         <inputAssignments>
