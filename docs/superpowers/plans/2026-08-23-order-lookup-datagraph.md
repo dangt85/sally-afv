@@ -35,9 +35,10 @@ Builder.
 - Format changed files with `npm run prettier` before considering a task done.
 - All sample data referenced during testing is fictitious Cairn Outdoor Co.
   data already loaded in `sally-prep` — never substitute real data.
-- Data Cloud ingestion (Data Streams) and Standard Data Model mapping for
-  `Account`/`Order`/`OrderItem`/`Product2` are **already done** in
-  `sally-prep` — do not redo them; Task 3 is a verification pass only.
+- Data Cloud Data Streams for `Account`/`Order`/`OrderItem`/`Product2` exist
+  in `sally-prep` but are **not yet activated or mapped** — Task 3 covers
+  activation and manual Standard Data Model mapping, not just verification
+  (corrected from this plan's original assumption once execution started).
 - `Cairn_Order_Lookup` (Flow) is deleted once the data graph path is proven
   working (Task 7) — it is not kept as a fallback.
 
@@ -185,61 +186,115 @@ EOF
 
 ---
 
-## Task 3: Verify Data Cloud ingestion & mapping (recap, not a rebuild)
+## Task 3: Activate & map the Data Streams to the Standard Data Model
 
-This is a guided checklist, not a code task — walked through together, live,
-in `sally-prep`'s Data Cloud Setup. Since ingestion/mapping is already done,
-this is a quick correctness pass before building the data graph on top of it
-in Task 4. A mapping mistake here silently breaks the data graph later, so
-it's worth the five minutes.
+Guided, hands-on — walked through together, live, in `sally-prep`'s Data
+Cloud Setup. Data Streams for `Account`, `Order`, `OrderItem`, `Product2`
+already exist but aren't activated or mapped yet. Order matters here:
+`Order` (→ `Sales Order`) first, since it's the one that establishes the
+relationship back to `Individual`; then `OrderItem` (→ `Sales Order
+Product`), since it relates to both `Sales Order` and `Product`; then
+`Product2` (→ `Product`) and `Account` (→ `Individual`) can happen in either
+order.
 
-- [ ] **Step 1: Confirm the four Data Streams are running**
+- [ ] **Step 1: Activate all four Data Streams**
 
-Data Cloud → Data Streams. Confirm four streams exist, sourced from the
-Salesforce CRM connector (not the "Sales and Service Cloud" data kit): one
-each for `Account` (filtered or confirmed to carry Person Accounts),
-`Order`, `OrderItem`, `Product2`. Each should show a recent, successful
-"Last Refresh."
+Data Cloud → Data Streams. For each of the four, activate it (this triggers
+Data Cloud to create a Data Lake Object — DLO — from the stream; give it a
+minute per stream). Confirm each shows a successful "Last Refresh" once
+active before moving on — mapping against a DLO with zero rows still works,
+but you won't be able to sanity-check field values until data has actually
+landed.
 
-- [ ] **Step 2: Confirm the Standard Data Model mapping**
+- [ ] **Step 2: Map `Order` → `Sales Order`**
 
-Data Cloud → Data Model → filter to "Mapped" objects. Confirm:
+Data Cloud → Data Model → New Mapping (or open the `Order` DLO directly and
+choose "Map to Data Model"). Choose **"Map to an existing Data Model
+Object"** — not "create new" — and search for `Sales Order` (or whatever
+your org's canvas actually calls it; standard object names can vary
+slightly by release, per `SETUP_GUIDE.md` §10 — use whatever you find, not
+this literal string, and tell me what it's actually called).
 
-| Salesforce object           | Mapped Data Model Object |
-| --------------------------- | ------------------------ |
-| `Account` (Person Accounts) | `Individual`             |
-| `Order`                     | `Sales Order`            |
-| `OrderItem`                 | `Sales Order Product`    |
-| `Product2`                  | `Product`                |
+Map at minimum:
 
-Note the _exact_ DMO names shown in your org's canvas — they can vary
-slightly by release/org (per `SETUP_GUIDE.md` §10). Write down whatever your
-canvas actually shows; Task 4 references these names and needs the real
-ones, not the table above verbatim if your org differs.
+- `Order.Id` → the Sales Order DMO's primary key field.
+- `Order.OrderNumber` → its order number field.
+- `Order.TotalAmount` → its total/amount field.
+- `Order.AccountId` → the relationship field pointing at `Individual` (this
+  is the link Task 4's data graph traverses — don't skip it).
+- `Order.Fulfillment_Status__c`, `Order.Estimated_Delivery_Date__c` — these
+  are custom fields with no standard DMO counterpart. Data Cloud lets you
+  add new custom fields to a standard DMO during mapping; add both here
+  rather than leaving them unmapped, since `order_lookup`'s output contract
+  needs both.
+- `Order.EffectiveDate` → map this too, even though the agent doesn't report
+  it — the data graph needs it to sort "most recent order" (per the design
+  spec's `EffectiveDate desc` convention).
 
-- [ ] **Step 3: Spot-check field-level mapping on the two objects the data graph will project fields from**
+Save the mapping.
 
-Click into the `Sales Order` DMO mapping and confirm `OrderNumber`,
-`TotalAmount`, `Fulfillment_Status__c`, `Estimated_Delivery_Date__c` are all
-mapped to DMO fields (custom fields map to custom DMO fields with the same
-or a generated name — confirm they're present, not dropped). Same check on
-`Individual` for whatever field carries the Account `Id` (should map to the
-DMO's primary/party identifier).
+- [ ] **Step 3: Map `OrderItem` → `Sales Order Product`**
 
-- [ ] **Step 4: Confirm the relationships between the four DMOs exist in the Data Model canvas**
+Same flow, mapping the `OrderItem` DLO to the standard DMO for line items
+(commonly `Sales Order Product` or `Sales Order Line Item` — again, use
+whatever your canvas actually offers).
 
-Still in Data Model, switch to the canvas/relationship view. Confirm
-`Individual` → `Sales Order` → `Sales Order Product` → `Product` are linked
-by relationship (not just independently mapped) — a data graph can only
-traverse relationships that already exist here. If any link is missing, add
-it now (this is schema-level, harmless to add if it's not already there):
-relationship from `Sales Order` to `Individual` on the buyer/account
-reference field, `Sales Order Product` to `Sales Order` on the order
-reference field, `Sales Order Product` to `Product` on the product
-reference field.
+Map at minimum:
 
-No commit for this task — it's a verification pass against existing org
-config, no files change.
+- `OrderItem.Id` → primary key.
+- `OrderItem.OrderId` → relationship field pointing at `Sales Order`.
+- `OrderItem.Product2Id` → relationship field pointing at `Product`.
+- `OrderItem.Quantity`, `OrderItem.UnitPrice` — optional, not required by
+  `order_lookup`'s current output, but cheap to include now for a richer
+  answer later. Skip `OrderItem.TotalPrice` — same "system-calculated on
+  insert" quirk noted in `SETUP_GUIDE.md` §10 applies here; it exists on the
+  source record so it's fine to map if you want it, just don't expect to
+  write to it anywhere.
+
+Save the mapping.
+
+- [ ] **Step 4: Map `Product2` → `Product`**
+
+Map the `Product2` DLO to the standard `Product` DMO.
+
+Map at minimum:
+
+- `Product2.Id` → primary key.
+- `Product2.Name` → product name field.
+- `Product2.ProductCode` → SKU/product code field, if the DMO has one.
+
+Save the mapping.
+
+- [ ] **Step 5: Map `Account` → `Individual` (if not already done)**
+
+Map the `Account` DLO (Person Accounts) to the standard `Individual` DMO.
+Map at minimum `Account.Id` → the DMO's party/individual identifier field,
+and `Account.FirstName` (used elsewhere by the agent's `FirstName` linked
+variable, so worth having here too even though the data graph itself
+doesn't strictly need it).
+
+- [ ] **Step 6: Confirm the relationships resolved in the Data Model canvas**
+
+Data Cloud → Data Model → canvas/relationship view. Confirm `Individual` →
+`Sales Order` → `Sales Order Product` → `Product` now show as linked
+relationships (not just four independently-mapped objects) — these should
+have been created automatically by the `AccountId`/`OrderId`/`Product2Id`
+relationship-field mappings in Steps 2–4. If any link is missing, add it
+manually here before moving to Task 4 — a data graph can only traverse
+relationships that exist in this canvas.
+
+- [ ] **Step 7: Let data catch up, then spot-check**
+
+Streaming ingestion isn't instant — give it a few minutes. Then, in Data
+Cloud's Data Explorer, query the `Sales Order` DMO and confirm you see rows
+with real `OrderNumber`/`TotalAmount` values matching what
+`sf data query --target-org sally-prep --query "SELECT OrderNumber, TotalAmount FROM Order LIMIT 5"`
+shows you directly. If it's empty, don't assume the mapping is broken —
+recheck after a few more minutes first.
+
+No commit for this task — Data Cloud config lives in Data Cloud, not
+`force-app` (consistent with how `SETUP_GUIDE.md` §6.1 already treats this
+as a manual, on-camera build step, not deployable metadata).
 
 ---
 
