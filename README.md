@@ -21,9 +21,9 @@ agent or case creation when the agent can't help.
 
 Two Salesforce **sandbox** orgs, aliased as below:
 
-| Alias | Purpose |
-|---|---|
-| `sally-prep` | Build and rehearse everything here first. |
+| Alias        | Purpose                                         |
+| ------------ | ----------------------------------------------- |
+| `sally-prep` | Build and rehearse everything here first.       |
 | `sally-demo` | Kept clean; built from scratch live, on camera. |
 
 ```bash
@@ -80,16 +80,16 @@ as a working example of Agent Script. It's scaffold only, not part of the Cairn
 Outdoor Co. demo — it'll be replaced as the real agent is built out per
 `docs/REQUIREMENTS.md` and `docs/SETUP_GUIDE.md`.
 
-| Component | Type | Purpose |
-|---|---|---|
-| `Local_Info_Agent.agent` | Agent Script | Starter template agent — tools, reasoning, variables, flow control. |
-| `CheckWeather` | Apex Class | Invocable Apex example. |
-| `CurrentDate` | Apex Class | Invocable Apex example. |
-| `WeatherService` | Apex Class | Mock data example. |
-| `Get_Event_Info` | Prompt Template | Prompt template example. |
-| `Get_Resort_Hours` | Flow | Flow example. |
-| `Resort_Agent` / `Resort_Admin` | Permission Sets | Starter template permission sets. |
-| `AFDX_Agent_Perms` / `AFDX_User_Perms` | Permission Set Groups | Starter template permission set groups. |
+| Component                              | Type                  | Purpose                                                             |
+| -------------------------------------- | --------------------- | ------------------------------------------------------------------- |
+| `Local_Info_Agent.agent`               | Agent Script          | Starter template agent — tools, reasoning, variables, flow control. |
+| `CheckWeather`                         | Apex Class            | Invocable Apex example.                                             |
+| `CurrentDate`                          | Apex Class            | Invocable Apex example.                                             |
+| `WeatherService`                       | Apex Class            | Mock data example.                                                  |
+| `Get_Event_Info`                       | Prompt Template       | Prompt template example.                                            |
+| `Get_Resort_Hours`                     | Flow                  | Flow example.                                                       |
+| `Resort_Agent` / `Resort_Admin`        | Permission Sets       | Starter template permission sets.                                   |
+| `AFDX_Agent_Perms` / `AFDX_User_Perms` | Permission Set Groups | Starter template permission set groups.                             |
 
 ## Read All About It
 

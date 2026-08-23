@@ -7,8 +7,8 @@ Guidance for Claude Code when working in this repo.
 A Salesforce DX project for an **Agentforce Voice demo**, recorded for the
 [CodeWithSally](https://www.youtube.com/@CodeWithSally) YouTube channel. The
 fictitious scenario, sample data requirements, and agent use cases are defined in
-[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — read that first for *what* we're
-building. [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) has the *how* — org setup,
+[`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — read that first for _what_ we're
+building. [`docs/SETUP_GUIDE.md`](docs/SETUP_GUIDE.md) has the _how_ — org setup,
 data loading mechanics, agent build steps. Keep both docs in sync with reality as the
 build progresses; they're the run-of-show for a live recording, not just planning
 artifacts.
