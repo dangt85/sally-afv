@@ -25,10 +25,12 @@
 ## Task 1: Scaffold the `Cairn_Compass` Agent Script bundle
 
 **Files:**
+
 - Create: `force-app/main/default/aiAuthoringBundles/Cairn_Compass/Cairn_Compass.agent`
 - Create: `force-app/main/default/aiAuthoringBundles/Cairn_Compass/Cairn_Compass.bundle-meta.xml`
 
 **Interfaces:**
+
 - Produces: topic names `agent_router`, `order_lookup`, `company_faq`, `product_qa`, `escalate_to_agent`, `create_case`, `off_topic`, `unclear_request` — Task 5 references `order_lookup`, `create_case`, and `escalate_to_agent` by these exact names when wiring live actions.
 - Produces: session variables `queue_target` (string enum `Orders_Returns`/`Customer_Support`, default `Customer_Support`), `human_agent_available` (boolean), `caller_issue_summary` (string) — Task 5 reads/writes these exact names.
 - Produces: action placeholder names `order_lookup_action` (will bind to `Cairn_Order_Lookup` Flow in Task 5), `create_case_action` (will bind to `Cairn_Create_Case` Flow in Task 5).
@@ -113,9 +115,11 @@
 ## Task 2: Build the `Cairn_Order_Lookup` Flow
 
 **Files:**
+
 - Create: `force-app/main/default/flows/Cairn_Order_Lookup.flow-meta.xml`
 
 **Interfaces:**
+
 - Consumes: `Order`/`OrderItem`/`Account` schema, including `Order.Fulfillment_Status__c` and `Order.Estimated_Delivery_Date__c` (already deployed, per spec §0).
 - Produces: an Autolaunched Flow, API name `Cairn_Order_Lookup`, with this exact input/output contract, which Task 5 wires into `Cairn_Compass.agent`'s `order_lookup_action`:
   - Inputs (all optional, but at least one identifying combination expected): `OrderNumberInput` (Text), `CustomerNameInput` (Text), `CustomerPhoneInput` (Text), `CustomerEmailInput` (Text).
@@ -167,9 +171,11 @@
 ## Task 3: Build the `Cairn_Create_Case` Flow
 
 **Files:**
+
 - Create: `force-app/main/default/flows/Cairn_Create_Case.flow-meta.xml`
 
 **Interfaces:**
+
 - Produces: an Autolaunched Flow, API name `Cairn_Create_Case`, with this exact input/output contract, which Task 5 wires into `Cairn_Compass.agent`'s `create_case_action`:
   - Inputs: `CallerNameInput` (Text), `CallerPhoneInput` (Text, optional), `CallerEmailInput` (Text, optional), `IssueSummaryInput` (Text).
   - Outputs: `CaseNumberOutput` (Text).
@@ -214,25 +220,32 @@
 ## Task 4: Create the `Cairn_Voice_Agent` permission set
 
 **Files:**
+
 - Create: `force-app/main/default/permissionsets/Cairn_Voice_Agent.permissionset-meta.xml`
 
 **Interfaces:**
+
 - Consumes: Flow API names `Cairn_Order_Lookup` (Task 2), `Cairn_Create_Case` (Task 3).
 - Produces: permission set API name `Cairn_Voice_Agent`, intended for assignment to the agent's runtime/default user (assignment itself happens per-org during agent setup, not via this metadata).
 
 - [ ] **Step 1: Write the permission set**
 
   ```xml
-  <?xml version="1.0" encoding="UTF-8"?>
+  <?xml version="1.0" encoding="UTF-8" ?>
   <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
       <label>Cairn Voice Agent</label>
-      <description>Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — flow execution for order lookup and case creation.</description>
+      <description
+    >Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — flow execution for order lookup and case creation.</description>
       <flowAccesses>
-          <flow>Cairn_Order_Lookup</flow>
+          <flow>
+  Cairn_Order_Lookup;
+      </flow>
           <enabled>true</enabled>
       </flowAccesses>
       <flowAccesses>
-          <flow>Cairn_Create_Case</flow>
+          <flow>
+  Cairn_Create_Case;
+      </flow>
           <enabled>true</enabled>
       </flowAccesses>
   </PermissionSet>
@@ -255,9 +268,11 @@
 ## Task 5: Wire the live actions into `Cairn_Compass.agent` and redeploy
 
 **Files:**
+
 - Modify: `force-app/main/default/aiAuthoringBundles/Cairn_Compass/Cairn_Compass.agent`
 
 **Interfaces:**
+
 - Consumes: `Cairn_Order_Lookup` Flow contract (Task 2), `Cairn_Create_Case` Flow contract (Task 3), topic/variable names from Task 1.
 
 - [ ] **Step 1: Bind `order_lookup_action` to the `Cairn_Order_Lookup` flow**
@@ -294,6 +309,7 @@
 ## Task 6: Update `REQUIREMENTS.md` and `SETUP_GUIDE.md` for the AFCC-only, function-based-queue pivot
 
 **Files:**
+
 - Modify: `docs/REQUIREMENTS.md` (§2.3, §6, §7, §8)
 - Modify: `docs/SETUP_GUIDE.md` (§1, §5, §7)
 

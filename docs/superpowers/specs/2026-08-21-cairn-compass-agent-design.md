@@ -50,11 +50,11 @@ New `AiAuthoringBundle` at
   order status, company FAQs, product Q&A, and escalation to a human agent."
 - `config.default_agent_user`: placeholder `UPDATE_WITH_YOUR_DEFAULT_AGENT_USER`
   (resolved per-org at deploy time, not committed as a real user).
-- `system.messages.welcome`: short, voice-native, e.g. *"Hey, this is Compass
-  with Cairn Outdoor — what can I help you with?"* — no "How may I assist you
+- `system.messages.welcome`: short, voice-native, e.g. _"Hey, this is Compass
+  with Cairn Outdoor — what can I help you with?"_ — no "How may I assist you
   today," no self-description of capabilities up front.
-- `system.messages.error`: short recovery line, e.g. *"Sorry, I hit a snag
-  there — could you say that again?"*
+- `system.messages.error`: short recovery line, e.g. _"Sorry, I hit a snag
+  there — could you say that again?"_
 - `language`: `default_locale: "en_US"` only. No language-based branching —
   `Account.Preferred_Language__c` stays in the schema but is not read by the
   agent or by escalation routing (English-only for this build, per decision;
@@ -77,11 +77,11 @@ testable rules:
 4. **Context continuity.** Never re-ask for information already given earlier
    in the same call (order number, name, issue description, etc.).
 5. **Gricean cooperative-conversation maxims:**
-   - *Quantity* — say enough to answer, not more.
-   - *Quality* — don't state unverified things as fact; ground lookups in
+   - _Quantity_ — say enough to answer, not more.
+   - _Quality_ — don't state unverified things as fact; ground lookups in
      real data, don't guess at order/product details.
-   - *Relation* — stay relevant to what was actually asked.
-   - *Manner* — be brief, unambiguous, and orderly; avoid obscure phrasing.
+   - _Relation_ — stay relevant to what was actually asked.
+   - _Manner_ — be brief, unambiguous, and orderly; avoid obscure phrasing.
 6. **Sound like a person on the phone, not a form.** Contractions, plain
    words, no "Please hold while I process your request"-style filler; brief
    natural acknowledgments ("Got it," "One sec") are fine, silence during a
@@ -128,11 +128,11 @@ menu, no re-classification at escalation time.
 
 ## 4. Session variables
 
-| Variable | Type | Purpose |
-|---|---|---|
-| `queue_target` | mutable string enum | Drives which AFCC queue `escalate_to_agent` transfers into (§3). |
-| `human_agent_available` | mutable boolean | Set by the outcome of the escalation attempt; gates whether `create_case` runs next. |
-| `caller_issue_summary` | mutable string | Short summary of the caller's unresolved issue, captured for `create_case`'s `Description`. |
+| Variable                | Type                | Purpose                                                                                     |
+| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `queue_target`          | mutable string enum | Drives which AFCC queue `escalate_to_agent` transfers into (§3).                            |
+| `human_agent_available` | mutable boolean     | Set by the outcome of the escalation attempt; gates whether `create_case` runs next.        |
+| `caller_issue_summary`  | mutable string      | Short summary of the caller's unresolved issue, captured for `create_case`'s `Description`. |
 
 Order-lookup identifiers (order number, name/phone/email) are passed as action
 inputs on `order_lookup`'s Flow action, not stored as persistent variables —
