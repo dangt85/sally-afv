@@ -56,7 +56,7 @@ Out of scope for this spec:
   forward into the data graph design below.
 - Data Cloud ingestion (Data Streams) and Standard Data Model mapping for
   `Account`→`Individual`, `Order`→`Sales Order`, `OrderItem`→`Sales Order
-  Product`, `Product2`→`Product` are already done in `sally-prep`.
+Product`, `Product2`→`Product` are already done in `sally-prep`.
 
 ## 1. Schema & Flow changes
 
@@ -194,6 +194,6 @@ Taught step-by-step during implementation, covering (at minimum):
 - `company_faq`/`product_qa` retrievers — separate vector-search builds, no
   data graph involved.
 - Whether `order_lookup` should eventually let a known caller ask about a
-  *different* one of their orders by relative description ("the one before
+  _different_ one of their orders by relative description ("the one before
   that") rather than only by explicit order number — deferred, not designed
   here.

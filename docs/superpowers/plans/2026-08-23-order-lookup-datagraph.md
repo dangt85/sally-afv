@@ -46,9 +46,11 @@ Builder.
 ## Task 1: `VoiceCall.Account__c` lookup field
 
 **Files:**
+
 - Create: `force-app/main/default/objects/VoiceCall/fields/Account__c.field-meta.xml`
 
 **Interfaces:**
+
 - Produces: `VoiceCall.Account__c` (Lookup(Account)) — consumed by Task 2
   (Flow sets it) and Task 5 (agent's `AccountId` linked variable reads it).
 
@@ -108,9 +110,11 @@ EOF
 ## Task 2: `Cairn_Inbound` flow — set `Account__c` instead of `RelatedRecordId`
 
 **Files:**
+
 - Modify: `force-app/main/default/flows/Cairn_Inbound.flow-meta.xml:213-217`
 
 **Interfaces:**
+
 - Consumes: `VoiceCall.Account__c` (Task 1).
 - Produces: `VoiceCall.Account__c` populated on single ANI match — consumed by
   Task 5's `AccountId` linked variable.
@@ -120,7 +124,7 @@ EOF
 In `recordUpdates` → `UpdateVoiceCall`, replace:
 
 ```xml
-        <inputAssignments>
+<inputAssignments>
             <field>RelatedRecordId</field>
             <value>
                 <elementReference>varAccountId</elementReference>
@@ -131,7 +135,7 @@ In `recordUpdates` → `UpdateVoiceCall`, replace:
 with:
 
 ```xml
-        <inputAssignments>
+<inputAssignments>
             <field>Account__c</field>
             <value>
                 <elementReference>varAccountId</elementReference>
@@ -201,14 +205,14 @@ each for `Account` (filtered or confirmed to carry Person Accounts),
 
 Data Cloud → Data Model → filter to "Mapped" objects. Confirm:
 
-| Salesforce object | Mapped Data Model Object |
-| --- | --- |
-| `Account` (Person Accounts) | `Individual` |
-| `Order` | `Sales Order` |
-| `OrderItem` | `Sales Order Product` |
-| `Product2` | `Product` |
+| Salesforce object           | Mapped Data Model Object |
+| --------------------------- | ------------------------ |
+| `Account` (Person Accounts) | `Individual`             |
+| `Order`                     | `Sales Order`            |
+| `OrderItem`                 | `Sales Order Product`    |
+| `Product2`                  | `Product`                |
 
-Note the *exact* DMO names shown in your org's canvas — they can vary
+Note the _exact_ DMO names shown in your org's canvas — they can vary
 slightly by release/org (per `SETUP_GUIDE.md` §10). Write down whatever your
 canvas actually shows; Task 4 references these names and needs the real
 ones, not the table above verbatim if your org differs.
@@ -249,6 +253,7 @@ Data Cloud → Data Graphs → New.
 A **data graph** is a saved, denormalized JSON-shaped view Data Cloud
 assembles at query time by walking a chosen root DMO out across its mapped
 relationships — contrast with:
+
 - A **DMO query**: one flat object, no nesting.
 - A **vector search index** (what `company_faq`/`product_qa` use):
   unstructured/semantic similarity search over text chunks — no structure,
@@ -271,6 +276,7 @@ path this whole feature is for.
 - [ ] **Step 3: Add the relationship chain**
 
 In the data graph builder, starting from `Individual`:
+
 1. Add the related object `Sales Order` (the relationship you confirmed/added
    in Task 3, Step 4) as a 1:many child.
 2. Under `Sales Order`, add `Sales Order Product` as a 1:many child.
@@ -295,13 +301,14 @@ In the data graph builder, starting from `Individual`:
 - [ ] **Step 5: Define lookup keys**
 
 Add two lookup keys on the data graph:
+
 1. `Individual`'s identifier field — the known-caller path (`AccountIdInput`
    in the agent action, Task 5).
 2. `Sales Order.OrderNumber` — the explicit-order-number path (callers the
    ANI match didn't cover, or a caller asking about a different order than
    the one proactively surfaced).
 
-Both need to resolve through the *same* data graph, since `order_lookup`
+Both need to resolve through the _same_ data graph, since `order_lookup`
 will call one action either way (per the spec's "full replace" decision).
 
 - [ ] **Step 6: Save, publish/activate the data graph**
@@ -339,9 +346,11 @@ Part UI (Agent Builder), part file edit (`Cairn_Compass.agent`) — done
 together since the file edit depends on what Agent Builder generates.
 
 **Files:**
+
 - Modify: `force-app/main/default/aiAuthoringBundles/Cairn_Compass/Cairn_Compass.agent`
 
 **Interfaces:**
+
 - Consumes: `VoiceCall.Account__c` (Task 1), `Cairn_Order_Lookup_Graph` data
   graph (Task 4, or whatever name you actually gave it).
 - Produces: `@variables.AccountId` — not consumed elsewhere in this plan, but
@@ -468,6 +477,7 @@ to that block, since it's a linked variable, not caller-spoken input.
 Run: `sf project deploy start --target-org sally-prep --source-dir force-app/main/default/aiAuthoringBundles/Cairn_Compass`
 Then AFDX: Preview This Agent, in **live** mode (Data Cloud dependency means
 simulated mode can't meaningfully exercise this). Test two utterances:
+
 1. As a known caller (preview tooling that lets you set the `VoiceCall`
    context's `Account__c`, or test via an actual routed call) — "what's the
    status of my order?" with no identifiers given. Expected: agent answers
@@ -498,10 +508,12 @@ EOF
 ## Task 6: Remove `Cairn_Order_Lookup` (Flow) and update the permission set
 
 **Files:**
+
 - Delete: `force-app/main/default/flows/Cairn_Order_Lookup.flow-meta.xml`
 - Modify: `force-app/main/default/permissionsets/Cairn_Voice_Agent.permissionset-meta.xml`
 
 **Interfaces:**
+
 - Consumes: Task 5's live-verified data graph action (don't run this task
   until Task 5, Step 6's preview passes — this is the point of no return for
   the Flow path).
@@ -518,10 +530,10 @@ before deleting.
 In `Cairn_Voice_Agent.permissionset-meta.xml`, delete this block:
 
 ```xml
-    <flowAccesses>
+<flowAccesses>
         <flow>
 Cairn_Order_Lookup;
-    </flow>
+  </flow>
         <enabled>true</enabled>
     </flowAccesses>
 ```
@@ -568,6 +580,7 @@ EOF
 ## Task 7: Update `SETUP_GUIDE.md` and `REQUIREMENTS.md`
 
 **Files:**
+
 - Modify: `docs/SETUP_GUIDE.md` §6.1, §10
 - Modify: `docs/REQUIREMENTS.md` §5.1
 
@@ -627,6 +640,7 @@ in Tasks 1–7 actually works together, not just individually.
 Place (or simulate, if a real Amazon Connect test call isn't set up yet) an
 inbound call from a phone number matching one of the 6 seeded Person
 Accounts. Confirm:
+
 - The welcome message uses their first name (already-working behavior,
   regression-check only).
 - Asking "what's the status of my order" with zero identifiers given
