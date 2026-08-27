@@ -16,8 +16,8 @@ It's written as a run-of-show: build and rehearse everything here against
 - **Data Cloud (Data360)** provisioned in both orgs — for the order lookup data graph
   and for the vector search index backing the FAQ/Product Q&A Apex retrievers.
 - **Amazon Connect** instance connected to both orgs via **Salesforce Service Cloud
-  Voice**, with the two existing queues (`Cairn Support – English`,
-  `Cairn Support – Spanish`) already configured — this is the "current state" the
+  Voice**, with the two existing queues (`Cairn Support`,
+  `Cairn Orders & Returns`) already configured — this is the "current state" the
   demo starts from.
 - VS Code with **Salesforce Extensions** + **Agentforce DX** extension, or
   Cursor/Claude Code for the pro-code agent build.

@@ -134,9 +134,6 @@ answer directly, without needing an order or product lookup:
 - Store Locations & Hours
 - How to Reach a Human Agent
 
-Given the English/Spanish queue split, these should exist (or be demoed) in both
-languages where practical.
-
 ## 4. Agent Use Cases (Functional Requirements)
 
 The Agentforce Voice agent must support the following:
@@ -151,8 +148,7 @@ The Agentforce Voice agent must support the following:
    troubleshooting, how-tos) grounded in the linked PDF manuals/guides, not just
    free-form generation. (Grounding/retrieval approach: §5.3.)
 4. **Escalation to a human agent** — If a question can't be answered by the agent,
-   escalate the live call to a human agent in the appropriate Amazon Connect queue
-   (English or Spanish).
+   escalate the live call to a human agent in the appropriate queue.
 5. **Case creation as a fallback** — If a question can't be answered _and_ no human
    agent is available to escalate to, create a `Case` capturing the caller's issue so
    a human can follow up later.
@@ -208,7 +204,7 @@ the alternate is what they're evaluating next.
 - **Primary — Amazon Connect + Salesforce Voice**: matches Cairn's real current call
   center stack. The demo shows the AI service agent slotting into the existing Amazon
   Connect queues/IVR and Salesforce Service Cloud Voice, escalating into the same
-  English/Spanish queues agents already work today.
+  queues agents already work today.
 - **Alternate — Agentforce Contact Center (AFCC)**: Salesforce's native CCaaS
   offering, shown as the "what if you moved off Amazon Connect entirely" story.
 
