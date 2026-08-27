@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <actionCalls>
         <name>Find_Person_By_Phone</name>
@@ -14,8 +14,8 @@
         <inputParameters>
             <name>phoneNumber</name>
             <value>
-                <elementReference
-        >input_record.FromPhoneNumber</elementReference>
+                <elementReference>Get_Voice_Call.FromPhoneNumber</elementReference>
+                <inputConfiguratorMode>Resource</inputConfiguratorMode>
             </value>
         </inputParameters>
         <nameSegment>PersonAccountPhoneLookup</nameSegment>
@@ -74,8 +74,7 @@
         <inputParameters>
             <name>queueLabel</name>
             <value>
-                <stringValue
-        >Default Queue Agentforce Contact Center</stringValue>
+                <stringValue>Default Queue Agentforce Contact Center</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -190,6 +189,27 @@
         </value>
     </processMetadataValues>
     <processType>RoutingFlow</processType>
+    <recordLookups>
+        <name>Get_Voice_Call</name>
+        <label>Get Voice Call</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Find_Person_By_Phone</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Id</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>recordId</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>VoiceCall</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
     <recordUpdates>
         <name>UpdateVoiceCall</name>
         <label>Update Voice Call</label>
@@ -207,15 +227,15 @@
             </value>
         </filters>
         <inputAssignments>
-            <field>ContactName__c</field>
-            <value>
-                <elementReference>varFirstName</elementReference>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
             <field>Account__c</field>
             <value>
                 <elementReference>varAccountId</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>ContactName__c</field>
+            <value>
+                <elementReference>varFirstName</elementReference>
             </value>
         </inputAssignments>
         <object>VoiceCall</object>
@@ -224,18 +244,10 @@
         <locationX>0</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>Find_Person_By_Phone</targetReference>
+            <targetReference>Get_Voice_Call</targetReference>
         </connector>
     </start>
     <status>Active</status>
-    <variables>
-        <name>input_record</name>
-        <dataType>SObject</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-        <objectType>VoiceCall</objectType>
-    </variables>
     <variables>
         <name>recordId</name>
         <dataType>String</dataType>
