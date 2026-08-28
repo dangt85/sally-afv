@@ -361,12 +361,16 @@ cross-checked against core Salesforce and matched exactly:
 
 ---
 
-## Task 4: Build the Data Graph
+## Task 4: Build the Data Graph — DONE
 
 Guided, hands-on walkthrough — the genuinely new part. Do this together, in
-Data Cloud → Data Graphs → New.
+Data Cloud → Data Graphs → New. Steps below are left as originally written for
+reproducing this in `sally-demo`, but see **"What actually happened"**
+immediately after for the real UI mechanics (no `Individual`/lookup-key screen
+exists the way originally assumed), the graph's actual name, and one open risk
+carried into Task 5.
 
-- [ ] **Step 1: Understand what you're building before opening the UI**
+- [x] **Step 1: Understand what you're building before opening the UI**
 
 A **data graph** is a saved, denormalized JSON-shaped view Data Cloud
 assembles at query time by walking a chosen root DMO out across its mapped
@@ -382,7 +386,7 @@ inherently multi-object (the order itself, its line items, the products on
 those line items, the customer who placed it) — exactly the shape
 `SETUP_GUIDE.md` §5.1 calls out as what a data graph is suited for.
 
-- [ ] **Step 2: Choose the root object**
+- [x] **Step 2: Choose the root object**
 
 Root the data graph at **`Account`** (not `Individual`, not `Sales Order`).
 
@@ -398,7 +402,7 @@ needed. If you rooted at `Sales Order` instead, you'd need the order id or
 number up front for every query, which defeats the known-caller path this
 whole feature is for.
 
-- [ ] **Step 3: Add the relationship chain**
+- [x] **Step 3: Add the relationship chain**
 
 In the data graph builder, starting from `Account`:
 
@@ -409,7 +413,7 @@ In the data graph builder, starting from `Account`:
    (lookup, not nested collection — a product is referenced, not owned, by
    the line item).
 
-- [ ] **Step 4: Select fields to project at each level**
+- [x] **Step 4: Select fields to project at each level**
 
 - `Account`: `ssot__Id__c` (the identifier field), `ssot__Name__c`.
 - `Sales Order`: `ssot__OrderNumber__c`, `ssot__TotalAmount__c`, the mapped
@@ -422,7 +426,7 @@ In the data graph builder, starting from `Account`:
   `order_lookup`'s current output contract).
 - `Product`: `ssot__Name__c`.
 
-- [ ] **Step 5: Define lookup keys**
+- [x] **Step 5: Define lookup keys**
 
 Add two lookup keys on the data graph:
 
@@ -436,12 +440,12 @@ Add two lookup keys on the data graph:
 Both need to resolve through the _same_ data graph, since `order_lookup`
 will call one action either way (per the spec's "full replace" decision).
 
-- [ ] **Step 6: Save, publish/activate the data graph**
+- [x] **Step 6: Save, publish/activate the data graph**
 
 Give it a clear developer name — e.g. `Cairn_Order_Lookup_Graph` — you'll
 need this exact name in Task 5. Publish/activate it.
 
-- [ ] **Step 7: Sanity-check it's queryable, independent of the agent**
+- [x] **Step 7: Sanity-check it's queryable, independent of the agent**
 
 Use Data Cloud's Data Explorer (or the data graph's own "Query" preview
 panel if your org's builder has one) to run a lookup by `Account` id for
@@ -462,6 +466,88 @@ No commit for this task — the data graph lives in Data Cloud, not
 on-camera build steps, not deployable metadata — reproduced by hand in
 `sally-demo` by re-following this same walkthrough, not by a metadata
 deploy).
+
+### What actually happened (real UI mechanics, graph name, and one open risk for Task 5)
+
+Verified directly in `sally-prep`'s Data Cloud UI plus cross-checked against
+core Salesforce via SOQL — matched exactly on every field tested:
+
+- **Graph type — Standard, not Real-Time.** The New Data Graph wizard offers
+  `Standard Data Graph` ("fast near real time performance") vs
+  `Real-Time Data Graph` ("resides in Hot Layer, supports computation in
+  milliseconds"). Despite this being for a voice agent, **Standard is
+  correct**: Real-Time Data Graphs are consumed via the Web/Mobile SDK +
+  Query API path for Journey Builder/Real-Time Interaction Management
+  personalization — a different code path from the Data Cloud
+  Retriever → Agent Builder grounding mechanism Task 5 needs. Standard Data
+  Graphs are what's exposed to that retriever picker.
+- **Root, chain, and fields built as planned** — `Account` (2 fields:
+  `ssot__Id__c`, `ssot__Name__c`) → `Sales Order` (9 fields) →
+  `Sales Order Product` (11 fields, a few more than the plan's minimum:
+  `List Price Amount`, `Order Product Number`, `Total Price Amount` also
+  included, harmless) → `Product` (6 fields, `Product Family`/`Description`
+  also included beyond the plan's `Name`/`ProductCode` minimum).
+- **`Order.EffectiveDate`'s real target field, undocumented in Task 3:**
+  neither `Activated Date` (`ssot__ActivatedDateTime__c`) nor `Created Date`
+  (`ssot__CreatedDate__c`) holds it — both are bulk-load timestamps, identical
+  across every order. The actual field is **`Order Start Date`**
+  (`ssot__OrderStartDate__c`) — confirmed by comparing 5 orders' values
+  directly against core `Order.EffectiveDate`, exact match every time. Task
+  3's "what actually happened" note should have listed this mapping and
+  didn't; noting the gap here for anyone reproducing in `sally-demo`. The
+  `Sales Order` node's **Sort and Limit** section (on the `Filters` tab) is
+  set to `Sort Field: Order Start Date`, `Sort Order: Descending`,
+  `Record Limit: 100` — this is what actually drives "most recent order"
+  ordering, not a graph-level setting.
+- **No "lookup keys" configuration screen exists in this builder**, despite
+  the plan (and Data Graph API docs describing "primary/secondary lookup
+  keys") assuming one. Ruled out every plausible candidate in the UI:
+  - The `Filters` tab's `Filter Conditions` panel requires a literal
+    `Value` — leaving it blank silently reverts to unset on save/refresh.
+    It's a static data-scoping filter (e.g. "only Shipped orders"), not a
+    runtime-bound query parameter.
+  - `Edit Properties` only holds Name/API Name/Data Space/Description.
+  - The `Preview` button is a **JSON schema preview** (field shapes/types),
+    not a live query tool.
+  - A field-level chevron dropdown exists only on Key/Foreign-Key-type rows
+    (offering "Select as Root Key") — never on plain business fields like
+    `Order Number`. Whatever "lookup key" means at the API level, it isn't
+    configured here for arbitrary fields.
+- **Empirically, only the root's primary key is queryable.** Data Cloud →
+  Data Explorer → Objects → Data Graphs → `Compass Order Lookup` lists all 6
+  rows keyed by `Account Id` (no filter/search control at all — it's a plain
+  record browser, not a query tool), each with a `Json Blob` column holding
+  the full nested payload. Verified account `001Sv00000gWLyyIAG` (Maria
+  Alvarez)'s JSON: 20 nested orders, correctly sorted by `Order Start Date`
+  descending, and order `00000226`'s fields (`TotalAmount` 1808,
+  `Fulfillment_Status__c` "Processing", `Estimated_Delivery_Date__c`
+  2026-08-28, `Order Start Date` 2026-08-21) matched core Salesforce's
+  `Order` row for that `OrderNumber` exactly. **The known-caller
+  (Account id) lookup path is fully proven.**
+- **Open risk carried into Task 5 — the `OrderNumber` lookup path is
+  unverified.** Data Explorer's Objects browser has no way to filter by
+  `OrderNumber` (only `Account Id` at the `Account` root, or the internal
+  `Sales Order Id` from within `Sales Order Product`'s foreign-key field —
+  neither is the caller-facing order number). This may just be a limitation
+  of Data Explorer's basic browser rather than the actual Data Graph Query
+  API or Agent Builder's retriever-action generation, both of which are
+  untested here — Task 5 needs to confirm, when building the retriever
+  action, whether `OrderNumber` is a usable input. Considered building a
+  second, `Sales Order`-rooted graph as a hedge, but rejected for now: it
+  would likely reproduce the same problem under `Sales Order Id` (still an
+  internal id, not `OrderNumber`, which was never mapped as a Key/Qualifier
+  field in Task 3), and the plan's design explicitly wants **one** data
+  graph serving both paths. If Task 5 proves `OrderNumber` truly isn't
+  queryable through the retriever, revisit then — possibly by remapping
+  `OrderNumber` as a Key Qualifier field in Data Model Mapping (Task 3
+  territory), not by adding a second graph.
+- **Graph name:** built as **`Compass Order Lookup`**
+  (API name **`Compass_Order_Lookup`**) — not the plan's suggested
+  `Cairn_Order_Lookup_Graph`. Task 5 must use `Compass_Order_Lookup` verbatim
+  as the `retriever://` target.
+- **Refresh schedule:** every 1 hour (Standard Data Graph, scheduled
+  refresh — matches the "near real time," not instant, cadence Task 3
+  already established for the underlying Data Streams).
 
 ---
 
