@@ -17,8 +17,10 @@ inbound flow already matched the caller's ANI to an Account.
 `Cairn_Inbound` on a single ANI match, feeds a new `AccountId` linked variable
 on `Cairn_Compass.agent`. `order_lookup`'s action retargets from
 `flow://Cairn_Order_Lookup` to a `retriever://` action backed by a Data Cloud
-data graph rooted at `Individual`, joined out to `Sales Order` → `Sales Order
-Product` → `Product`, queryable by either Account/Individual id or order
+data graph rooted at **`Account`** (corrected from `Individual` once Task 3
+execution revealed `Individual`'s primary key is locked on this sandbox — see
+Task 3's "What actually happened" note), joined out to `Sales Order` →
+`Sales Order Product` → `Product`, queryable by either Account id or order
 number — so the same action serves both the known-caller and
 explicit-order-number paths.
 
@@ -36,9 +38,21 @@ Builder.
 - All sample data referenced during testing is fictitious Cairn Outdoor Co.
   data already loaded in `sally-prep` — never substitute real data.
 - Data Cloud Data Streams for `Account`/`Order`/`OrderItem`/`Product2` exist
-  in `sally-prep` but are **not yet activated or mapped** — Task 3 covers
-  activation and manual Standard Data Model mapping, not just verification
-  (corrected from this plan's original assumption once execution started).
+  in `sally-prep` and are now **activated and mapped** (Task 3 is done — see
+  its "What actually happened" note for the real field/DMO names and the two
+  sandbox gotchas hit along the way).
+- Data Cloud field-picker search matches on the **field label**, not the API
+  name, and labels in this org don't always match what you'd guess from the
+  API name (`Order.TotalAmount`'s label is "Order Amount", not "Total
+  Amount") — if a field you know exists doesn't show up in a mapping search,
+  try the label instead of the API name before assuming it's unmapped.
+- This sandbox blocks **replacing** a DMO field's existing source mapping
+  ("Switch Mapping is not supported on Sandbox Org") — this hit both
+  `Individual`'s primary key (already locked to a pre-existing source) and
+  `Sales Order`'s `Ship To Contact` field. The workaround both times was to
+  map onto a different, still-unmapped target field instead of fighting the
+  lock — don't attempt to delete/replace an existing mapping in `sally-prep`
+  or `sally-demo` without expecting this.
 - `Cairn_Order_Lookup` (Flow) is deleted once the data graph path is proven
   working (Task 7) — it is not kept as a fallback.
 
@@ -186,18 +200,22 @@ EOF
 
 ---
 
-## Task 3: Activate & map the Data Streams to the Standard Data Model
+## Task 3: Activate & map the Data Streams to the Standard Data Model — DONE
 
 Guided, hands-on — walked through together, live, in `sally-prep`'s Data
-Cloud Setup. Data Streams for `Account`, `Order`, `OrderItem`, `Product2`
-already exist but aren't activated or mapped yet. Order matters here:
-`Order` (→ `Sales Order`) first, since it's the one that establishes the
-relationship back to `Individual`; then `OrderItem` (→ `Sales Order
-Product`), since it relates to both `Sales Order` and `Product`; then
-`Product2` (→ `Product`) and `Account` (→ `Individual`) can happen in either
-order.
+Cloud Setup. Steps below are left as originally written for reproducing this
+in `sally-demo`, but see **"What actually happened"** immediately after for
+the real field names, the two sandbox-lock gotchas, and the one step (Account
+→ `Individual`) that turned out to be unnecessary.
 
-- [ ] **Step 1: Activate all four Data Streams**
+Data Streams for `Account`, `Order`, `OrderItem`, `Product2` already exist
+but aren't activated or mapped yet. Order matters here: `Order` (→ `Sales
+Order`) first, since it's the one that establishes the relationship back to
+the account; then `OrderItem` (→ `Sales Order Product`), since it relates to
+both `Sales Order` and `Product`; then `Product2` (→ `Product`) and `Account`
+can happen in either order.
+
+- [x] **Step 1: Activate all four Data Streams**
 
 Data Cloud → Data Streams. For each of the four, activate it (this triggers
 Data Cloud to create a Data Lake Object — DLO — from the stream; give it a
@@ -206,7 +224,7 @@ active before moving on — mapping against a DLO with zero rows still works,
 but you won't be able to sanity-check field values until data has actually
 landed.
 
-- [ ] **Step 2: Map `Order` → `Sales Order`**
+- [x] **Step 2: Map `Order` → `Sales Order`**
 
 Data Cloud → Data Model → New Mapping (or open the `Order` DLO directly and
 choose "Map to Data Model"). Choose **"Map to an existing Data Model
@@ -219,9 +237,16 @@ Map at minimum:
 
 - `Order.Id` → the Sales Order DMO's primary key field.
 - `Order.OrderNumber` → its order number field.
-- `Order.TotalAmount` → its total/amount field.
-- `Order.AccountId` → the relationship field pointing at `Individual` (this
-  is the link Task 4's data graph traverses — don't skip it).
+- `Order.TotalAmount` → its total/amount field. Search the field picker by
+  label, not API name — in `sally-prep` this field's label is **"Order
+  Amount"**, so searching "total" finds nothing.
+- `Order.AccountId` → a relationship-typed field pointing at `Account` (this
+  is the link Task 4's data graph traverses — don't skip it). In `sally-prep`
+  the auto-generated `Ship To Contact` field was already mapped to something
+  else and is locked (sandbox can't switch it — see Global Constraints); use
+  **`Bill To Account`** instead, which is both unmapped and the correct
+  semantic fit for `AccountId` anyway. Mapping the field auto-creates the
+  `Sales Order` → `Account` relationship, confirmed in Step 6.
 - `Order.Fulfillment_Status__c`, `Order.Estimated_Delivery_Date__c` — these
   are custom fields with no standard DMO counterpart. Data Cloud lets you
   add new custom fields to a standard DMO during mapping; add both here
@@ -233,7 +258,7 @@ Map at minimum:
 
 Save the mapping.
 
-- [ ] **Step 3: Map `OrderItem` → `Sales Order Product`**
+- [x] **Step 3: Map `OrderItem` → `Sales Order Product`**
 
 Same flow, mapping the `OrderItem` DLO to the standard DMO for line items
 (commonly `Sales Order Product` or `Sales Order Line Item` — again, use
@@ -253,7 +278,7 @@ Map at minimum:
 
 Save the mapping.
 
-- [ ] **Step 4: Map `Product2` → `Product`**
+- [x] **Step 4: Map `Product2` → `Product`**
 
 Map the `Product2` DLO to the standard `Product` DMO.
 
@@ -265,25 +290,33 @@ Map at minimum:
 
 Save the mapping.
 
-- [ ] **Step 5: Map `Account` → `Individual` (if not already done)**
+- [x] **Step 5: `Account` — no additional mapping needed**
 
-Map the `Account` DLO (Person Accounts) to the standard `Individual` DMO.
-Map at minimum `Account.Id` → the DMO's party/individual identifier field,
-and `Account.FirstName` (used elsewhere by the agent's `FirstName` linked
-variable, so worth having here too even though the data graph itself
-doesn't strictly need it).
+Skip this. `Account` was already mapped to the standard `Account` DMO before
+this project touched it (pre-existing in this org, alongside its own
+Party/AccountContact/ContactPoint scaffolding — leave that alone, it's
+unrelated and harmless). It already carries the real 6 Person Accounts with
+correct `Account.Id`/`Name`. The original version of this step tried
+additionally mapping `Account` → `Individual`, on the theory the data graph
+would root there — that turned out to be unnecessary once the root object
+changed to `Account` (see "What actually happened" below); skip it in a
+fresh build.
 
-- [ ] **Step 6: Confirm the relationships resolved in the Data Model canvas**
+- [x] **Step 6: Confirm the relationship from `Sales Order` to `Account`**
 
-Data Cloud → Data Model → canvas/relationship view. Confirm `Individual` →
-`Sales Order` → `Sales Order Product` → `Product` now show as linked
-relationships (not just four independently-mapped objects) — these should
-have been created automatically by the `AccountId`/`OrderId`/`Product2Id`
-relationship-field mappings in Steps 2–4. If any link is missing, add it
-manually here before moving to Task 4 — a data graph can only traverse
-relationships that exist in this canvas.
+Data Cloud → Data Model → Relationships (Edit Relationships on the canvas).
+Confirm a `Sales Order` → `Account` relationship exists via the field you
+mapped `Order.AccountId` onto in Step 2 (in `sally-prep` this ended up being
+`Bill To Account`, after `Ship To Contact` turned out to be the wrong
+semantic fit — see below), targeting `Account`'s identifier field. Mapping a
+source field onto an already-relationship-typed target field auto-creates
+this relationship — you may not need to add it manually. Also confirm
+`Sales Order Product`'s relationships to `Sales Order` and `Product` exist
+(from the `OrderId`/`Product2Id` mappings in Steps 3–4). If any link is
+missing, add it manually here before moving to Task 4 — a data graph can
+only traverse relationships that exist in this canvas.
 
-- [ ] **Step 7: Let data catch up, then spot-check**
+- [x] **Step 7: Let data catch up, then spot-check**
 
 Streaming ingestion isn't instant — give it a few minutes. Then, in Data
 Cloud's Data Explorer, query the `Sales Order` DMO and confirm you see rows
@@ -295,6 +328,36 @@ recheck after a few more minutes first.
 No commit for this task — Data Cloud config lives in Data Cloud, not
 `force-app` (consistent with how `SETUP_GUIDE.md` §6.1 already treats this
 as a manual, on-camera build step, not deployable metadata).
+
+### What actually happened (real field/DMO names, for `sally-demo` reproduction)
+
+Verified directly against `sally-prep`'s Data Cloud via SOQL (`ssot__*__dlm`
+objects are queryable like any other sobject) — row counts and sample values
+cross-checked against core Salesforce and matched exactly:
+
+- **`Sales Order`** (`ssot__SalesOrder__dlm`): `ssot__OrderNumber__c`,
+  `ssot__TotalAmount__c` (mapped from `Order.TotalAmount`, labeled "Order
+  Amount" in this org), `Fulfillment_Status__c`, `Estimated_Delivery_Date__c`
+  (custom fields, no `ssot__` prefix), and `ssot__BillToAccountId__c` (mapped
+  from `Order.AccountId` — **not** `ssot__ShipToContactId__c`, which was
+  already locked to a different, empty mapping). Mapping `AccountId` onto
+  `Bill To Account` auto-created the `Sales Order` → `Account` relationship.
+- **`Sales Order Product`** (`ssot__SalesOrderProduct__dlm`): `ssot__SalesOrderId__c`,
+  `ssot__ProductId__c`, `ssot__OrderedQuantity__c`, `ssot__UnitPriceAmount__c`
+  — mapped cleanly on the first attempt, 329/329 rows match core `OrderItem`.
+- **`Product`** (`ssot__Product__dlm`): `ssot__Name__c`, `ssot__ProductCode__c`
+  — 132/132 rows match core `Product2` (only ~20 of which are real Cairn
+  products; the rest are unrelated pre-existing `Product2` records already in
+  the org — harmless noise, since no seeded order line item references them).
+- **`Account`** (`ssot__Account__dlm`): already mapped before this project
+  touched it (pre-existing CRM Data Kit scaffolding — `ssot__Id__c`,
+  `ssot__Name__c` hold the real 6 Person Accounts correctly). This is the
+  data graph's root object (see Task 4) — no `Individual` mapping needed.
+- **Dead end, harmless, left in place:** an `Account` → `Individual` mapping
+  (`Account.Id` → `ssot__PrimaryAccountId__c`, since `Individual`'s actual
+  primary key was locked) was built while `Individual` was still the planned
+  root object. Once the root changed to `Account`, this became unnecessary —
+  it's unused by the data graph but doesn't hurt anything left mapped.
 
 ---
 
@@ -321,19 +384,26 @@ those line items, the customer who placed it) — exactly the shape
 
 - [ ] **Step 2: Choose the root object**
 
-Root the data graph at `Individual` (not `Sales Order`). Rooting at
-`Individual` is what makes "query by the caller's matched Account, get back
-their order" a single call — the graph naturally nests that customer's
-orders underneath. If you rooted at `Sales Order` instead, you'd need the
-order id or number up front for every query, which defeats the known-caller
-path this whole feature is for.
+Root the data graph at **`Account`** (not `Individual`, not `Sales Order`).
+
+The original design called for rooting at `Individual` — that changed during
+Task 3 execution once `Individual`'s primary key turned out to be locked on
+this sandbox (see Task 3's "What actually happened"). `Account` achieves the
+exact same goal: rooting there is what makes "query by the caller's matched
+Account, get back their order" a single call — the graph naturally nests
+that customer's orders underneath. It's also a more direct fit than
+`Individual` ever would have been, since `VoiceCall.Account__c` (Task 1) is
+already an Account id — no extra hop through an `Individual`-side field
+needed. If you rooted at `Sales Order` instead, you'd need the order id or
+number up front for every query, which defeats the known-caller path this
+whole feature is for.
 
 - [ ] **Step 3: Add the relationship chain**
 
-In the data graph builder, starting from `Individual`:
+In the data graph builder, starting from `Account`:
 
-1. Add the related object `Sales Order` (the relationship you confirmed/added
-   in Task 3, Step 4) as a 1:many child.
+1. Add the related object `Sales Order` (the `Bill To Account` relationship
+   confirmed in Task 3, Step 6) as a 1:many child.
 2. Under `Sales Order`, add `Sales Order Product` as a 1:many child.
 3. Under `Sales Order Product`, add `Product` as a many:1 relationship
    (lookup, not nested collection — a product is referenced, not owned, by
@@ -341,24 +411,24 @@ In the data graph builder, starting from `Individual`:
 
 - [ ] **Step 4: Select fields to project at each level**
 
-- `Individual`: the identifier field (whatever your org's canvas calls it —
-  Task 3 Step 2), first name.
-- `Sales Order`: `OrderNumber`, `TotalAmount`, the mapped
+- `Account`: `ssot__Id__c` (the identifier field), `ssot__Name__c`.
+- `Sales Order`: `ssot__OrderNumber__c`, `ssot__TotalAmount__c`, the mapped
   `Fulfillment_Status__c` field, the mapped `Estimated_Delivery_Date__c`
   field, and the order's effective/created date field (needed for "most
   recent" sorting — check whichever date field your `Sales Order` mapping
   carries for `Order.EffectiveDate`).
-- `Sales Order Product`: quantity, unit price (optional — nice to have for
-  richer answers later, not required by `order_lookup`'s current output
-  contract).
-- `Product`: product name.
+- `Sales Order Product`: `ssot__OrderedQuantity__c`, `ssot__UnitPriceAmount__c`
+  (optional — nice to have for richer answers later, not required by
+  `order_lookup`'s current output contract).
+- `Product`: `ssot__Name__c`.
 
 - [ ] **Step 5: Define lookup keys**
 
 Add two lookup keys on the data graph:
 
-1. `Individual`'s identifier field — the known-caller path (`AccountIdInput`
-   in the agent action, Task 5).
+1. `Account`'s identifier field (`ssot__Id__c`) — the known-caller path
+   (`AccountIdInput` in the agent action, Task 5) — matches
+   `VoiceCall.Account__c` directly, no translation needed.
 2. `Sales Order.OrderNumber` — the explicit-order-number path (callers the
    ANI match didn't cover, or a caller asking about a different order than
    the one proactively surfaced).
@@ -374,7 +444,7 @@ need this exact name in Task 5. Publish/activate it.
 - [ ] **Step 7: Sanity-check it's queryable, independent of the agent**
 
 Use Data Cloud's Data Explorer (or the data graph's own "Query" preview
-panel if your org's builder has one) to run a lookup by `Individual` id for
+panel if your org's builder has one) to run a lookup by `Account` id for
 2–3 seeded accounts (get real ids: `sf data query --target-org sally-prep --query "SELECT Id, Name FROM Account WHERE Preferred_Language__c != null LIMIT 3"`).
 Expected: each query returns that customer's order(s) nested with line items
 and product names — matching what `sf data query` shows you directly against
@@ -646,8 +716,8 @@ EOF
 Rewrite the `3. **Data360 Data Graph**` list item to reflect what was
 actually built: the ingest/map sub-step stays (already done, described
 correctly); the "build the data graph" sub-step should name the actual root
-(`Individual`) and relationship chain (`Individual` → `Sales Order` →
-`Sales Order Product` → `Product`) and the two lookup keys (Individual id,
+(`Account`) and relationship chain (`Account` → `Sales Order` →
+`Sales Order Product` → `Product`) and the two lookup keys (Account id,
 order number), matching Task 4 above; the "wire it up" sub-step should add a
 sentence: when the inbound flow (§ new cross-reference, see Step 3 below) has
 already matched the caller's ANI to an Account, `order_lookup` calls this

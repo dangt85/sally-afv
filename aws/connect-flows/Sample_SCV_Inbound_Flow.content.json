@@ -99,9 +99,7 @@
             }
           }
         },
-        "dynamicParams": [
-          "voiceCallId"
-        ]
+        "dynamicParams": ["voiceCallId"]
       },
       "9551182f-4e7b-4cd1-bc26-42e538b7a5a5": {
         "position": {
@@ -190,18 +188,14 @@
             "NextAction": "2cab4f51-d8d3-4b77-98cc-917fffe29026",
             "Condition": {
               "Operator": "Equals",
-              "Operands": [
-                "ContinueLooping"
-              ]
+              "Operands": ["ContinueLooping"]
             }
           },
           {
             "NextAction": "da1c87de-5857-4a04-858e-8e53090ef529",
             "Condition": {
               "Operator": "Equals",
-              "Operands": [
-                "DoneLooping"
-              ]
+              "Operands": ["DoneLooping"]
             }
           }
         ]
