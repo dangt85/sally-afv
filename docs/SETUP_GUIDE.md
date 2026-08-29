@@ -251,6 +251,20 @@ moving to the next.
         Arbitrary nested fields like `Sales Order.OrderNumber` are not lookup keys, so
         the Apex resolves an order number to its Account id with a plain SOQL query
         against core `Order` first, then queries the graph by that id.
+      - **A caller the ANI didn't already identify can't resolve an order by number
+        alone** — an order number by itself is guessable and isn't proof it's really
+        their order. `order_lookup_action`'s `OrderDateInput` (the date the order was
+        placed) is required alongside `OrderNumberInput` for this path; the Apex
+        resolves the order by number, then checks `Order.EffectiveDate` against
+        `OrderDateInput` before returning anything — a mismatch, or either input
+        missing, is treated the same as no match found. The `AccountIdInput` path
+        (a caller the ANI already matched) skips this check entirely, since identity
+        is already established. `order_lookup`'s reasoning instructions escalate to a
+        human immediately if the caller can't supply both, rather than falling back to
+        another identifier, and give a deliberately minimal reply (fulfillment status
+        and estimated delivery date only — no name, no order number or total readback)
+        when a match is found this way, since the caller still isn't personally
+        identified the way an ANI match would establish.
       - The rows in `CdpQueryOutput.data` are raw Java maps, not Apex `Map`s. Calling
         any `Map` method on one (`get`, `keySet`, `size`, even `toString`) faults the
         Apex interpreter in a way `try`/`catch` cannot intercept, and the failure

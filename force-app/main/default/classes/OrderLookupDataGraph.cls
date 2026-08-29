@@ -20,12 +20,8 @@ public with sharing class OrderLookupDataGraph {
     public String AccountIdInput;
     @InvocableVariable(label='Order Number')
     public String OrderNumberInput;
-    @InvocableVariable(label='Customer Name')
-    public String CustomerNameInput;
-    @InvocableVariable(label='Customer Phone')
-    public String CustomerPhoneInput;
-    @InvocableVariable(label='Customer Email')
-    public String CustomerEmailInput;
+    @InvocableVariable(label='Order Date')
+    public Date OrderDateInput;
   }
 
   public class Result {
@@ -45,7 +41,7 @@ public with sharing class OrderLookupDataGraph {
 
   @InvocableMethod(
     label='Look Up Order In Data Cloud'
-    description='Finds a caller\'s order in the Compass_Order_Lookup Data Cloud data graph — by the account already matched from their ANI, by order number, or by full name plus a phone number or email.'
+    description='Finds a caller\'s order in the Compass_Order_Lookup Data Cloud data graph — by the account already matched from their ANI, or by an order number plus the date it was placed (both required together, since a caller the ANI didn\'t already identify can\'t be trusted on an order number alone).'
     category='Cairn Outdoor Co.'
   )
   public static List<Result> lookUpOrder(List<Request> requests) {
@@ -61,7 +57,7 @@ public with sharing class OrderLookupDataGraph {
     result.OrderFound = false;
 
     String orderNumber = trimToNull(req.OrderNumberInput);
-    String accountId = resolveAccountId(req, orderNumber);
+    String accountId = resolveAccountId(req);
     if (String.isBlank(accountId)) {
       return result;
     }
@@ -120,39 +116,31 @@ public with sharing class OrderLookupDataGraph {
 
   // The graph is only queryable by its root Account's id, so every path has to
   // arrive at one first. A caller the inbound flow already matched by ANI
-  // arrives with it in hand and skips this entirely; the other two paths spend
-  // one SOQL query against core CRM to get there.
-  private static String resolveAccountId(Request req, String orderNumber) {
-    if (orderNumber != null) {
-      List<Order> orders = [
-        SELECT AccountId
-        FROM Order
-        WHERE OrderNumber = :orderNumber
-        LIMIT 1
-      ];
-      return orders.isEmpty() ? null : orders[0].AccountId;
-    }
-
+  // arrives with it in hand and skips this entirely. A caller ANI didn't
+  // identify has to prove it's really their order: an order number alone is
+  // guessable, so it only resolves when the caller also gives the date the
+  // order was placed and it matches the record — either input missing, or a
+  // date mismatch, is treated the same as no match.
+  private static String resolveAccountId(Request req) {
     String knownAccountId = trimToNull(req.AccountIdInput);
     if (knownAccountId != null) {
       return knownAccountId;
     }
 
-    // Same criteria the Flow this replaces used: the name has to match, plus
-    // either contact detail, so one identifier alone can't surface an order.
-    String name = trimToNull(req.CustomerNameInput);
-    String phone = trimToNull(req.CustomerPhoneInput);
-    String email = trimToNull(req.CustomerEmailInput);
-    if (name == null || (phone == null && email == null)) {
+    String orderNumber = trimToNull(req.OrderNumberInput);
+    if (orderNumber == null || req.OrderDateInput == null) {
       return null;
     }
-    List<Account> accounts = [
-      SELECT Id
-      FROM Account
-      WHERE Name = :name AND (Phone = :phone OR PersonEmail = :email)
+    List<Order> orders = [
+      SELECT AccountId, EffectiveDate
+      FROM Order
+      WHERE OrderNumber = :orderNumber
       LIMIT 1
     ];
-    return accounts.isEmpty() ? null : accounts[0].Id;
+    if (orders.isEmpty() || orders[0].EffectiveDate != req.OrderDateInput) {
+      return null;
+    }
+    return orders[0].AccountId;
   }
 
   private static List<Object> fetchOrders(String accountId) {

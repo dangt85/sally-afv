@@ -151,49 +151,53 @@ subagent order_lookup:
             the order number, total, fulfillment status, and estimated
             delivery date in one short, natural sentence — don't read it back
             as a list of fields, and don't narrate that you looked anything
-            up. Then check whether that's the order they meant.
-            If that line is empty, or the caller wants a different order than
-            the one above, ask for the order number, or their full name plus
-            a phone number or email — whichever is fastest for them. Don't
-            ask for both if one is enough. Then call look_up_order with what
-            they gave you, and report what it returns in that same turn.
+            up. Then check whether that's the order they meant. If they want
+            a different order, ask for its order number and call
+            look_up_order with just that — you already know their account,
+            so the date isn't needed here.
+            If that line is empty, you don't yet know who this caller is —
+            their phone number didn't match exactly one account, so a name,
+            phone number, or email they give you isn't proof it's their
+            order. Ask for the order number and the date the order was
+            placed — you need both together; an order number alone isn't
+            enough to verify it. Then call look_up_order with both.
+            If look_up_order finds a match this way, don't personalize the
+            reply — no name, no greeting, and don't read back the order
+            number or total. Report only the fulfillment status and the
+            estimated delivery date, in one short sentence.
+            If the caller can't give you both the order number and the date,
+            or look_up_order doesn't find a match, don't keep asking for
+            other information or try a different way to identify them —
+            apologize briefly, let them know you'll get them to someone who
+            can look further into it, then hand them off right away.
             You have no order information of your own beyond what's above and
             what look_up_order returns. Every order number, total,
             fulfillment status and delivery date you say out loud must come
             from one of those two places. Never invent or estimate one.
-            If it still can't find a matching order, apologize briefly, let
-            the caller know you'll get them to someone who can look further
-            into it, then hand them off.
             If the caller wants something self-service can't do (like
             changing or cancelling an order), hand them off the same way once
             you've looked up the order.
 
         actions:
             look_up_order: @actions.order_lookup_action
-                description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or narrow it with an order number, or with the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+                description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or with an order number and the date the order was placed to verify an order for a caller who wasn't already identified. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
                 with AccountIdInput = @variables.AccountId
                 with OrderNumberInput = ...
-                with CustomerNameInput = ...
-                with CustomerPhoneInput = ...
-                with CustomerEmailInput = ...
+                with OrderDateInput = ...
             hand_off_to_specialist: @utils.transition to @subagent.escalate_to_agent
-                description: "Connect the caller with an orders and returns specialist once you have their identifiers and can't resolve the request yourself, or when look_up_order can't find a matching order."
+                description: "Connect the caller with an orders and returns specialist once you have their identifiers and can't resolve the request yourself, when look_up_order can't find a matching order, or when a caller who wasn't already identified can't provide both an order number and the date it was placed."
 
     actions:
         order_lookup_action:
-            description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or narrow it with an order number, or with the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+            description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or with an order number and the date the order was placed to verify an order for a caller who wasn't already identified. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
             target: "apex://OrderLookupDataGraph"
             inputs:
                 AccountIdInput: string
                     description: "The caller's Account Id, if already known from the ANI match in the inbound flow."
                 OrderNumberInput: string
                     description: "The order number, if the caller gave one."
-                CustomerNameInput: string
-                    description: "The caller's full name — pair with a phone number or email to find their order."
-                CustomerPhoneInput: string
-                    description: "The caller's phone number — pair with their name to find their order."
-                CustomerEmailInput: string
-                    description: "The caller's email address — pair with their name to find their order."
+                OrderDateInput: date
+                    description: "The date the order was placed, as the caller gave it. Required together with the order number to verify an order for a caller who wasn't already identified by ANI — an order number alone is not enough."
             outputs:
                 OrderFound: boolean
                     description: "Whether a matching order was found."

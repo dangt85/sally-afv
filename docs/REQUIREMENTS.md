@@ -140,7 +140,15 @@ The Agentforce Voice agent must support the following:
 
 1. **Order lookup** — Given identifying information from the caller, look up a
    standard `Order` and report back order number, total, status, and estimated
-   delivery date. (Grounding/retrieval approach: §5.1.)
+   delivery date. If the caller's ANI didn't resolve to exactly one Account (no
+   match, or more than one), the agent must not accept a bare order number as
+   proof — it also requires the date the order was placed, verified against the
+   record, before it will disclose anything; if the caller can't provide both or
+   they don't match, the agent escalates to a human rather than retrying with
+   other identifiers. That verified-but-unidentified path also gets a
+   deliberately minimal reply (fulfillment status and estimated delivery date
+   only, no name, no order number/total readback) rather than the personalized
+   full detail an ANI-verified caller gets. (Grounding/retrieval approach: §5.1.)
 2. **Company FAQs** — Answer frequently asked questions about Cairn Outdoor Co.
    (returns, shipping, warranty, price match, loyalty, store hours) grounded in the
    Knowledge articles above. (Grounding/retrieval approach: §5.2.)

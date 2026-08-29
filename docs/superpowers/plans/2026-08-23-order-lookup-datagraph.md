@@ -799,6 +799,47 @@ created mid-demo will not appear until the next refresh; and `before_reasoning`
 re-runs the graph query on every turn inside `order_lookup`, which adds a
 round-trip per turn.
 
+### Addendum (2026-08-29): unverified-caller order verification
+
+Follow-on change, done after Task 5 was otherwise complete: an order number
+alone was resolvable to an Account (and its data graph payload) with no other
+check, for any caller the ANI didn't already match — a guessable order number
+was sufficient to disclose someone else's order. `resolveAccountId`'s
+name+phone/email branch had the same weakness once removed from consideration:
+neither factor was verified against the order itself.
+
+**What changed:**
+
+- `OrderLookupDataGraph.Request` drops `CustomerNameInput`/`CustomerPhoneInput`/
+  `CustomerEmailInput` and gains `OrderDateInput: Date`. `resolveAccountId` now
+  requires `OrderNumberInput` **and** `OrderDateInput` together for a caller
+  without a known `AccountIdInput`, and checks the resolved `Order.EffectiveDate`
+  against `OrderDateInput` — a mismatch, or either input missing, returns no
+  match, same as today's "order not found" path. The known-account path
+  (`AccountIdInput` set) is unchanged and skips this check, since ANI already
+  established identity.
+- `order_lookup`'s reasoning instructions: an unidentified caller (empty
+  `known_order_summary`) is now asked for the order number and the date it was
+  placed together, not offered a "whichever is fastest" choice of order number
+  or name+phone/email. If they can't give both, or the lookup doesn't match,
+  the agent escalates immediately rather than trying another identifier. A
+  match found this way gets a deliberately minimal reply — fulfillment status
+  and estimated delivery date only, no name, no order number/total readback —
+  since the caller still isn't personally identified. The ANI-verified path
+  (ask-nothing, personalized, full detail) is unchanged.
+
+**Verified in `sally-prep`** via headless `sf agent preview --use-live-actions`
+(order `00000246`, placed `2026-08-21`, real fulfillment status `Processing`
+and delivery date `2026-08-26` cross-checked against `sf data query`):
+
+| Scenario                                                       | Result                                                                                                             |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Unidentified caller, correct order number + date               | "That order is still processing, with an estimated delivery date of August 26th." — no name, no order number/total |
+| Unidentified caller, order number but can't recall the date    | Agent declines to look it up and escalates immediately, without trying another identifier                          |
+| ANI-identified caller, no identifiers given (regression check) | Unchanged: personalized, full detail (order number, total, status, delivery date)                                  |
+
+`REQUIREMENTS.md` §4 and `SETUP_GUIDE.md` §6.1.3 updated to match.
+
 ---
 
 ## Task 6: Remove `Cairn_Order_Lookup` (Flow) and update the permission set
