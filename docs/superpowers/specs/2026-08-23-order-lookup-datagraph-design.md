@@ -145,9 +145,29 @@ Taught step-by-step during implementation, covering (at minimum):
 
 ## 5. Wire-up in Agent Builder
 
-- Add the published data graph as a retriever action on the `order_lookup`
-  topic in Agent Builder (native Data Cloud retriever action — no additional
-  Apex/Flow, per `SETUP_GUIDE.md` §6.1.3).
+- Point `order_lookup_action` at `apex://OrderLookupDataGraph` — an Apex
+  invocable that queries the data graph via
+  `ConnectApi.CdpQuery.getDataGraphData`. **Corrected during Task 5:** this
+  section previously called for a native no-code Data Cloud retriever action
+  with "no additional Apex/Flow". That mechanism does not exist — Setup →
+  Retrievers only offers a search-index retriever, which requires a DMO with a
+  vector search index, not a data graph. A data graph is only reachable through
+  the Data Graph Query API. See `SETUP_GUIDE.md` §6.1.3 for the two non-obvious
+  constraints (root-primary-key-only lookup, and the unreadable Gson rows).
+- Because the graph can only be looked up by its root Account id, the Apex
+  resolves the other two entry paths to an Account id first, with a plain SOQL
+  query against core CRM (`Order.OrderNumber` → `AccountId`; name plus phone or
+  email → `Account.Id`), then queries the graph by that id.
+- The known-caller path is pre-fetched deterministically in `order_lookup`'s
+  `before_reasoning` hook rather than left to the LLM to invoke. Left to its own
+  judgement the reasoning LLM would not call an action it had no inputs to fill,
+  and fabricated order numbers and totals instead; three successive instruction
+  rewrites failed to stop it. The hook runs the action whenever `AccountId` is
+  set and stores `OrderSummaryOutput` in `@variables.known_order_summary`, which
+  the instructions interpolate — so the data is in the prompt before the model
+  reasons. `OrderSummaryOutput` exists because Agent Script mutable variables
+  are limited to `string`/`number`/`boolean`/`object`, so the five typed outputs
+  can't each be held in one.
 - Record the actual generated action name/inputs/outputs and reconcile them
   into `Cairn_Compass.agent` §2 above (the `.agent` file stays the source of
   truth for what's committed, even though this one action's schema originates

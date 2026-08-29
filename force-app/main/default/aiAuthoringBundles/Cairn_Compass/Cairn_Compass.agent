@@ -57,6 +57,8 @@ variables:
         description: "Which specialist queue escalate_to_agent hands the caller off to. Valid values: Orders_Returns, Customer_Support. Set by order_lookup, company_faq, or product_qa before any hand-off to escalate_to_agent."
     human_agent_available: mutable boolean = True
         description: "Whether a live specialist is expected to be reachable. Set to False on entry to create_case, since create_case is only ever reached when a live transfer didn't connect."
+    known_order_summary: mutable string = ""
+        description: "The caller's most recent order, fetched from the Data Cloud data graph by order_lookup's before_reasoning hook before the agent reasons. Empty when the inbound call didn't identify the caller, or when they have no orders."
     caller_issue_summary: mutable string = ""
         description: "Short summary of the caller's unresolved issue, collected by create_case and passed along to case creation."
     VoiceCallId: linked string
@@ -132,30 +134,44 @@ subagent order_lookup:
 
     before_reasoning:
         set @variables.queue_target = "Orders_Returns"
+        if @variables.AccountId != "":
+            run @actions.order_lookup_action
+                with AccountIdInput = @variables.AccountId
+                set @variables.known_order_summary = @outputs.OrderSummaryOutput
 
     reasoning:
         instructions: |
             Callers here want to check an order's status, ask about a return,
             or ask to change or cancel an order.
-            Collect either the order number, or the caller's full name plus a
-            phone number or email — whichever is fastest for the caller to
-            give you. Don't ask for both if one is enough.
-            Once you have enough to identify the order, call look_up_order.
-            Say something short while it runs, since it isn't instant.
-            If it finds an order, lead with the answer: report the order
-            number, total, fulfillment status, and estimated delivery date in
-            one short, natural sentence — don't read it back as a list of
-            fields.
-            If it doesn't find a matching order, apologize briefly, let the
-            caller know you'll get them to someone who can look further into
-            it, then hand them off.
+            The caller's most recent order, already looked up for you before
+            this turn: {!@variables.known_order_summary}
+            If that line has an order in it, it is real, verified data for
+            this caller — don't call look_up_order again just to repeat it.
+            Lead with it: address the caller by their first name, then give
+            the order number, total, fulfillment status, and estimated
+            delivery date in one short, natural sentence — don't read it back
+            as a list of fields, and don't narrate that you looked anything
+            up. Then check whether that's the order they meant.
+            If that line is empty, or the caller wants a different order than
+            the one above, ask for the order number, or their full name plus
+            a phone number or email — whichever is fastest for them. Don't
+            ask for both if one is enough. Then call look_up_order with what
+            they gave you, and report what it returns in that same turn.
+            You have no order information of your own beyond what's above and
+            what look_up_order returns. Every order number, total,
+            fulfillment status and delivery date you say out loud must come
+            from one of those two places. Never invent or estimate one.
+            If it still can't find a matching order, apologize briefly, let
+            the caller know you'll get them to someone who can look further
+            into it, then hand them off.
             If the caller wants something self-service can't do (like
             changing or cancelling an order), hand them off the same way once
             you've looked up the order.
 
         actions:
             look_up_order: @actions.order_lookup_action
-                description: "Look up an order by order number, or by the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+                description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or narrow it with an order number, or with the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+                with AccountIdInput = @variables.AccountId
                 with OrderNumberInput = ...
                 with CustomerNameInput = ...
                 with CustomerPhoneInput = ...
@@ -165,9 +181,11 @@ subagent order_lookup:
 
     actions:
         order_lookup_action:
-            description: "Look up an order by order number, or by the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
-            target: "flow://Cairn_Order_Lookup"
+            description: "Look up an order. Call it with no inputs at all to get the most recent order for the caller the inbound call already identified, or narrow it with an order number, or with the caller's full name plus a phone number or email. Returns whether a matching order was found, and if so its number, total, fulfillment status, and estimated delivery date."
+            target: "apex://OrderLookupDataGraph"
             inputs:
+                AccountIdInput: string
+                    description: "The caller's Account Id, if already known from the ANI match in the inbound flow."
                 OrderNumberInput: string
                     description: "The order number, if the caller gave one."
                 CustomerNameInput: string
@@ -184,7 +202,7 @@ subagent order_lookup:
                     description: "The order's number."
                     is_displayable: True
                 TotalAmountOutput: object
-                    complex_data_type_name: "lightning__currencyType"
+                    complex_data_type_name: "lightning__numberType"
                     description: "The order's total amount."
                     is_displayable: True
                 FulfillmentStatusOutput: string
@@ -192,6 +210,9 @@ subagent order_lookup:
                     is_displayable: True
                 EstimatedDeliveryDateOutput: date
                     description: "The order's estimated delivery date."
+                    is_displayable: True
+                OrderSummaryOutput: string
+                    description: "The order's number, total, fulfillment status, and estimated delivery date as one flat line, for the before_reasoning pre-fetch to hold in a variable."
                     is_displayable: True
 
 subagent company_faq:

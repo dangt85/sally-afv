@@ -217,10 +217,26 @@ moving to the next.
    2. **Build the data graph** — build a data graph over the mapped standard objects,
       keyed for lookup by order number and customer identifier, so a single query
       returns the order, its line items, the customer, and the ordered products.
-   3. **Wire it up** — add the data graph as a native Data Cloud retriever action
-      directly on the `order_lookup` topic in Agent Builder (the same mechanism used
-      for `product_qa` in §6.3). No additional Apex/Flow is needed to invoke it — Data
-      Cloud resolves the query from the action's input parameters.
+   3. **Wire it up** — point `order_lookup_action` at an Apex invocable action
+      (`apex://OrderLookupDataGraph`) that queries the data graph. There is **no**
+      no-code retriever action for a data graph: Setup → Retrievers only offers a
+      search-index retriever (the `product_qa`/`company_faq` mechanism in §6.3),
+      which needs a DMO with a vector search index, not a data graph. A data graph is
+      queried through the Data Graph Query API — from Apex via
+      `ConnectApi.CdpQuery.getDataGraphData(graphName, accountId, 'default')`.
+      Two things about that call are worth knowing before you write against it:
+      - Its lookup key must be the **root DMO's primary key** (here, the Account id).
+        Arbitrary nested fields like `Sales Order.OrderNumber` are not lookup keys, so
+        the Apex resolves an order number to its Account id with a plain SOQL query
+        against core `Order` first, then queries the graph by that id.
+      - The rows in `CdpQueryOutput.data` are raw Java maps, not Apex `Map`s. Calling
+        any `Map` method on one (`get`, `keySet`, `size`, even `toString`) faults the
+        Apex interpreter in a way `try`/`catch` cannot intercept, and the failure
+        aborts the request before debug logs flush — so it looks like nothing ran.
+        `String.valueOf(row)` is safe, and renders as
+        `{json_blob__c=<the whole graph as JSON>, version__c=0}`; cut the payload out
+        of that string and `JSON.deserializeUntyped` it into real Apex collections.
+        See `OrderLookupDataGraph.parseRow`.
 
 ### 6.2 Company FAQ
 

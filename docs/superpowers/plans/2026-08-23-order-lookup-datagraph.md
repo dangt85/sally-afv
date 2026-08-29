@@ -567,7 +567,7 @@ together since the file edit depends on what Agent Builder generates.
 - Produces: `@variables.AccountId` — not consumed elsewhere in this plan, but
   is the linked variable future work (spec §8) would build on.
 
-- [ ] **Step 1: Add the data graph as a retriever action, in Agent Builder**
+- [x] **Step 1: Add the data graph as a retriever action, in Agent Builder**
 
 Open `Cairn_Compass` in Agent Builder → `Order Lookup` topic → Actions → Add
 Action → Data Cloud Retriever (or your org's equivalent label) → select the
@@ -575,13 +575,13 @@ Action → Data Cloud Retriever (or your org's equivalent label) → select the
 inputs matching the lookup keys from Task 4 Step 5 and outputs matching the
 projected fields from Task 4 Step 4.
 
-- [ ] **Step 2: Record the generated action's exact shape**
+- [x] **Step 2: Record the generated action's exact shape**
 
 Write down (you'll need these verbatim for Step 4): the action's
 `developerName` (this becomes the `retriever://<name>` target), and its
 input/output parameter names as Agent Builder generated them.
 
-- [ ] **Step 3: Add the `AccountId` linked variable**
+- [x] **Step 3: Add the `AccountId` linked variable**
 
 In `Cairn_Compass.agent`, in the `variables:` block, immediately after the
 existing `FirstName` variable:
@@ -592,7 +592,7 @@ existing `FirstName` variable:
         description: "The Account Id matched from the caller's ANI in the inbound flow, if any. Empty when the ANI didn't match a single Person Account."
 ```
 
-- [ ] **Step 4: Update `order_lookup`'s reasoning instructions**
+- [x] **Step 4: Update `order_lookup`'s reasoning instructions**
 
 Replace the `order_lookup` subagent's `reasoning.instructions` block:
 
@@ -624,7 +624,7 @@ Replace the `order_lookup` subagent's `reasoning.instructions` block:
             you've looked up the order.
 ```
 
-- [ ] **Step 5: Retarget `order_lookup_action`**
+- [x] **Step 5: Retarget `order_lookup_action`**
 
 Replace the action definition (still named `order_lookup_action`, so the
 `actions:` reference in `reasoning.actions.look_up_order` above doesn't need
@@ -683,7 +683,7 @@ same way they already are in `reasoning.actions.look_up_order` (`with
 OrderNumberInput = ...` etc.) — only add `with AccountIdInput = @variables.AccountId`
 to that block, since it's a linked variable, not caller-spoken input.
 
-- [ ] **Step 6: Deploy and preview**
+- [x] **Step 6: Deploy and preview**
 
 Run: `sf project deploy start --target-org sally-prep --source-dir force-app/main/default/aiAuthoringBundles/Cairn_Compass`
 Then AFDX: Preview This Agent, in **live** mode (Data Cloud dependency means
@@ -696,7 +696,7 @@ simulated mode can't meaningfully exercise this). Test two utterances:
 2. An order number spoken explicitly. Expected: still resolves correctly
    through the same action.
 
-- [ ] **Step 7: Format and commit**
+- [x] **Step 7: Format and commit**
 
 ```bash
 npm run prettier
@@ -713,6 +713,91 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
 EOF
 )"
 ```
+
+---
+
+### What actually happened (retriever → Apex correction, and an unreadable API result)
+
+Steps 1–2 above are **wrong and were not performed**: there is no no-code
+Data Cloud retriever action for a data graph. Setup → Retrievers offers only
+`Data Cloud: Retrieve data from a Data Cloud search index` — the mechanism
+`company_faq`/`product_qa` use — which requires a DMO with a vector search
+index and rejects a data graph outright ("No DMO with search index
+available"). A data graph is reachable only through the Data Graph Query API.
+So the action retargets to `apex://OrderLookupDataGraph`, not `retriever://`.
+Step 3's `AccountId` linked variable already existed (commit `e571f3e`) and
+needed no change.
+
+- **Only the root primary key is a lookup key.** `getDataGraphData` and
+  `getDataGraphDataWithLookupKeys` accept the root DMO's primary key (the
+  Account id) — not nested fields like `Sales Order.OrderNumber`. Task 4's
+  "two lookup keys" idea is therefore not achievable, and remapping
+  `OrderNumber` as the Sales Order DMO's primary key would hit the same
+  "Switch Mapping is not supported on Sandbox Org" lock as Task 3. Instead
+  `OrderLookupDataGraph` resolves to an Account id first with plain SOQL
+  against core CRM (`Order.OrderNumber` → `AccountId`, or name plus phone/email
+  → `Account.Id`), then always queries the graph by that id. A caller the ANI
+  already matched skips the resolve entirely.
+- **`CdpQueryOutput.data` rows are not Apex `Map`s** — they are raw Java
+  `com.google.gson.internal.LinkedTreeMap` objects. `JSON.serialize` on the
+  list throws a clean `JSONException`, but calling _any_ `Map` method on a row
+  (`get`, `keySet`, `size`, `toString`) faults the interpreter below the Apex
+  layer: `try`/`catch` does not intercept it, and it surfaced variously as
+  `InterpreterRuntimeException: Made lookup for method that does not exist:
+com/salesforce/api/fast/Map.keySet()`, an opaque `UNKNOWN_EXCEPTION`, and —
+  most misleadingly — a run with **zero debug output**, which looked like the
+  method never executed. It had executed; the fault aborts the request before
+  logs flush. (An empty `sf apex log list` is not evidence either way: without
+  a TraceFlag, anonymous-Apex logs are never persisted as `ApexLog` rows.)
+  `String.valueOf(row)` is safe — it dispatches to the Java `toString()` — and
+  renders as `{json_blob__c=<the whole graph as JSON>, version__c=0}`. Cutting
+  that payload out of the string and running `JSON.deserializeUntyped` on it
+  yields ordinary Apex collections. That is what `parseRow` does, and it made
+  `queryAnsiSqlV2`/REST-callout fallbacks unnecessary — the data graph itself
+  is what the demo actually queries.
+- **The known-caller path had to become deterministic.** Left to invoke
+  `look_up_order` on its own, the reasoning LLM would not call an action it had
+  no inputs to fill — it narrated "one sec, let me pull that up" and ended the
+  turn, then on later attempts **fabricated** order numbers and totals
+  (`#40389 / $148.50`, `#45219 / $87.50`, `#1043982 / $89.95` on successive
+  runs). Three instruction rewrites, including an explicit "never invent an
+  order's details", all failed. The fix is architectural: `order_lookup`'s
+  `before_reasoning` hook now runs the action deterministically whenever
+  `AccountId` is set and stores the result in `@variables.known_order_summary`,
+  which the instructions interpolate — the real data is in the prompt before
+  the model reasons, so there is nothing left to invent. This is why the Apex
+  gained a sixth output, `OrderSummaryOutput`: Agent Script mutable variables
+  are limited to `string`/`number`/`boolean`/`object` (`date` is
+  action-parameter-only), so the five typed outputs cannot each be held in one.
+- **`lightning__currencyType` is invalid for an Apex `Decimal` output.** The
+  runtime rejected the Flow-era declaration with an exact instruction: use
+  `lightning__numberType`. Worth knowing when porting any Flow action to Apex.
+- **`sf agent preview` is drivable headlessly**, contrary to the assumption
+  that a human had to run it. It is an Ink TUI needing a real pty, but
+  `script -qc "…" /dev/null < fifo` with `stty cols 120 rows 45` works, and
+  `--output-dir` writes machine-readable `transcript.jsonl` plus per-turn
+  traces (the traces are what proved the action was never invoked). Linked
+  variables are set with the **`$Context.` prefix** —
+  `--context-variables '$Context.AccountId=…'`; without the prefix they are
+  treated as state variables and silently do not resolve.
+
+**Verified live in `sally-prep`** (Maria Alvarez, `001Sv00000gWLyyIAG`):
+
+| Utterance                                                  | Result                                                                                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| "hey, I was wondering about my recent order" (ANI matched) | "Maria, your most recent order is 00000226 for $1,808, and it's still processing… August 28, 2026" — no identifiers asked |
+| "actually I meant order 00000222" (same call)              | $1,127, Processing, August 30, 2026                                                                                       |
+| "can you check order 00000216 for me?" (no ANI match)      | $1,224, Processing, August 29, 2026                                                                                       |
+
+All values match core CRM exactly. The Apex was also exercised directly across
+all six branches (known account, order number, name+email, name+phone,
+insufficient identifiers, unknown order number) — the last two correctly return
+`OrderFound = false` rather than failing.
+
+**Two caveats for the recording:** the data graph refreshes hourly, so an order
+created mid-demo will not appear until the next refresh; and `before_reasoning`
+re-runs the graph query on every turn inside `order_lookup`, which adds a
+round-trip per turn.
 
 ---
 
