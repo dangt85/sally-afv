@@ -1,6 +1,12 @@
+/**
+ * `order_lookup`'s action: reads the caller's order out of the Data Cloud data
+ * graph. See SETUP_GUIDE.md §6.1.3 — a data graph has no no-code retriever
+ * action, so it's queried through the Data Graph Query API from Apex.
+ */
 public with sharing class OrderLookupDataGraph {
-  // The Data Cloud data graph built in Task 4: Account -> Sales Order ->
-  // Sales Order Product -> Product, with Sales Order sorted newest-first.
+  // Account -> Sales Order -> Sales Order Product -> Product, with the Sales
+  // Order node sorted newest-first (that sort is what makes orders[0] "most
+  // recent"). Refreshes hourly, so a just-created order won't be here yet.
   private static final String DATA_GRAPH_NAME = 'Compass_Order_Lookup';
   private static final String DATA_GRAPH_VERSION = 'default';
   private static final String ORDERS_NODE = 'ssot__SalesOrder__dlm';
@@ -87,10 +93,13 @@ public with sharing class OrderLookupDataGraph {
     return result;
   }
 
-  // Agent Script can only hold a pre-fetched result in a string variable, so
-  // the subagent's before_reasoning hook reads this one line rather than the
-  // five typed outputs. Keeping the wording flat and factual lets the agent
-  // put it into its own words without inventing anything.
+  // order_lookup's before_reasoning hook pre-fetches the known caller's order
+  // and holds it in a variable, and Agent Script variables can only be
+  // string/number/boolean/object — so the five typed outputs can't each be held
+  // in one, and this flat line stands in for them. Keeping it factual and
+  // unformatted lets the agent put it into its own words without inventing
+  // anything, which is the whole point: left to call the action on its own
+  // judgement, the LLM fabricated order numbers instead.
   private static String summarize(Result result) {
     List<String> parts = new List<String>{
       'order ' + result.OrderNumberOutput

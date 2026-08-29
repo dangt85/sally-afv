@@ -7,9 +7,13 @@ Cursor and Claude Code.
 The scenario: **Cairn Outdoor Co.**, a fictitious direct-to-consumer outdoor gear
 retailer whose call center runs on Amazon Connect + Salesforce Service Cloud Voice
 with two human-only queues (English and Spanish). The demo adds an Agentforce Voice
-service agent in front of that stack — order lookup, company FAQs, product Q&A
-grounded in real product manuals via a Data360 data graph, and escalation to a human
-agent or case creation when the agent can't help.
+service agent in front of that stack — order lookup grounded in a Data360 data graph,
+company FAQs and product Q&A grounded in real Knowledge articles and product manuals
+via Data Cloud vector search, and escalation to a human agent or case creation when
+the agent can't help.
+
+Each grounding approach is built in stages on camera, so the demo shows _why_ each
+upgrade matters — see [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) §5.
 
 - **What we're building**: [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — the
   fictitious scenario, sample data spec, and agent use cases.
@@ -74,22 +78,26 @@ If you prefer Claude Code or Cursor over Agentforce Vibes, copy these skills fro
 
 ## What's Inside This DX Project?
 
-This project was scaffolded from Salesforce's Agentforce DX starter template, which
-ships a sample agent (**Local Info Agent** — local weather, events, and resort hours)
-as a working example of Agent Script. It's scaffold only, not part of the Cairn
-Outdoor Co. demo — it'll be replaced as the real agent is built out per
-`docs/REQUIREMENTS.md` and `docs/SETUP_GUIDE.md`.
+The project was scaffolded from Salesforce's Agentforce DX starter template. That
+template's sample agent (**Local Info Agent**) and its example Apex/Flow/prompt
+components have been removed — everything below is Cairn Outdoor Co.'s own build.
 
-| Component                              | Type                  | Purpose                                                             |
-| -------------------------------------- | --------------------- | ------------------------------------------------------------------- |
-| `Local_Info_Agent.agent`               | Agent Script          | Starter template agent — tools, reasoning, variables, flow control. |
-| `CheckWeather`                         | Apex Class            | Invocable Apex example.                                             |
-| `CurrentDate`                          | Apex Class            | Invocable Apex example.                                             |
-| `WeatherService`                       | Apex Class            | Mock data example.                                                  |
-| `Get_Event_Info`                       | Prompt Template       | Prompt template example.                                            |
-| `Get_Resort_Hours`                     | Flow                  | Flow example.                                                       |
-| `Resort_Agent` / `Resort_Admin`        | Permission Sets       | Starter template permission sets.                                   |
-| `AFDX_Agent_Perms` / `AFDX_User_Perms` | Permission Set Groups | Starter template permission set groups.                             |
+| Component                                                     | Type                | Purpose                                                                                                       |
+| ------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `Cairn_Compass`                                               | Agent Script bundle | The voice agent: router plus `order_lookup`, `company_faq`, `product_qa`, `escalate_to_agent`, `create_case`. |
+| `OrderLookupDataGraph`                                        | Apex Class          | `order_lookup`'s action. Queries the Data360 data graph via `ConnectApi.CdpQuery`.                            |
+| `PersonAccountPhoneLookup`                                    | Apex Class          | Matches an inbound caller's ANI to a Person Account.                                                          |
+| `Cairn_Inbound` / `Cairn_Outbound`                            | Flows               | Service Cloud Voice call handling; `Cairn_Inbound` sets `VoiceCall.Account__c` on a single ANI match.         |
+| `Cairn_Order_Lookup`                                          | Flow                | The order-lookup stage-1 implementation, kept for the staged build in `REQUIREMENTS.md` §5.1.                 |
+| `Cairn_Create_Case`                                           | Flow                | Creates a `Case` when escalation isn't possible.                                                              |
+| `Order.Fulfillment_Status__c` / `.Estimated_Delivery_Date__c` | Custom Fields       | Order status details the agent reports back.                                                                  |
+| `VoiceCall.Account__c` / `.ContactName__c`                    | Custom Fields       | Carry the ANI-matched caller into the agent as linked variables.                                              |
+| `Account.Preferred_Language__c`                               | Custom Field        | Drives which Amazon Connect queue `escalate_to_agent` transfers into.                                         |
+| `Cairn_Voice_Agent` / `Cairn_Data_Load`                       | Permission Sets     | Runtime access for the agent user; sample-data load access.                                                   |
+
+> **Note:** `Cairn_Voice_Agent.permissionset-meta.xml` is listed in `.prettierignore`.
+> `@prettier/plugin-xml` rewrites its `<flow>` text nodes with a trailing semicolon,
+> which the Metadata API then rejects. Don't remove that exclusion.
 
 ## Read All About It
 

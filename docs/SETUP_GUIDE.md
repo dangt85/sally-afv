@@ -189,6 +189,25 @@ starting split:
 Preview each topic in simulated mode in VS Code (`AFDX: Preview This Agent`) before
 wiring up real data, then switch to live mode once Apex/Flow/data are deployed.
 
+`sf agent preview` is the CLI equivalent, and it can be scripted despite being an
+interactive TUI — useful for regression-checking a topic without re-typing utterances
+by hand:
+
+```bash
+mkfifo in.fifo
+( sleep 28; printf 'what is the status of my order?'; sleep 2; printf '\r'; sleep 150 ) > in.fifo &
+script -qc 'stty cols 120 rows 45; sf agent preview --target-org sally-prep \
+  --authoring-bundle Cairn_Compass --use-live-actions \
+  --context-variables "\$Context.AccountId=001Sv00000gWLyyIAG" \
+  --output-dir ./transcripts' /dev/null < in.fifo
+```
+
+Two gotchas: linked variables need the **`$Context.` prefix** — without it they're
+treated as state variables and silently don't resolve — and `--output-dir` writes
+`transcript.jsonl` plus per-turn trace files. Read the traces, not just the
+transcript: they list which actions actually fired, which is the only way to tell a
+grounded answer from a confidently hallucinated one.
+
 ## 6. Grounding & Retrieval Build
 
 ### 6.1 Order Lookup
@@ -215,8 +234,11 @@ moving to the next.
       available in the org's Data Model canvas before mapping — Data Cloud's Standard
       Data Model can vary slightly by org/release.
    2. **Build the data graph** — build a data graph over the mapped standard objects,
-      keyed for lookup by order number and customer identifier, so a single query
-      returns the order, its line items, the customer, and the ordered products.
+      so a single query returns the order, its line items, the customer, and the
+      ordered products. Root the graph at `Account` and sort the `Sales Order` node by
+      `Order Start Date` descending (Filters tab → Sort and Limit) — that sort is what
+      makes "my most recent order" resolvable. There is no lookup-key configuration
+      screen in this builder, and only the root's primary key is queryable; see step 3.
    3. **Wire it up** — point `order_lookup_action` at an Apex invocable action
       (`apex://OrderLookupDataGraph`) that queries the data graph. There is **no**
       no-code retriever action for a data graph: Setup → Retrievers only offers a
@@ -237,6 +259,26 @@ moving to the next.
         `{json_blob__c=<the whole graph as JSON>, version__c=0}`; cut the payload out
         of that string and `JSON.deserializeUntyped` it into real Apex collections.
         See `OrderLookupDataGraph.parseRow`.
+      - An Apex `Decimal` output must be declared `lightning__numberType` in the
+        `.agent` file. The Flow-era `lightning__currencyType` is rejected at runtime.
+
+      **Fetch the known caller's order deterministically, not by asking the LLM to.**
+      `order_lookup`'s `before_reasoning` hook runs the action whenever `AccountId` is
+      set and stores the result in `@variables.known_order_summary`, which the
+      reasoning instructions interpolate. This is not a stylistic choice: left to
+      decide for itself, the reasoning LLM would not call an action it had no inputs
+      to fill — it either narrated "one sec, let me pull that up" and ended the turn,
+      or **fabricated** plausible order numbers and totals. Several rounds of
+      instruction wording, including an explicit "never invent an order's details",
+      did not fix it; putting the real data in the prompt before the model reasons
+      did. The Apex's `OrderSummaryOutput` exists for this hook, because Agent Script
+      mutable variables are limited to `string`/`number`/`boolean`/`object` (`date` is
+      action-parameter-only), so the five typed outputs can't each be held in one.
+
+      Two caveats worth knowing on camera: the data graph refreshes hourly, so an
+      order created mid-demo won't appear until the next refresh; and the
+      `before_reasoning` hook re-runs the graph query on every turn inside
+      `order_lookup`, which adds a round-trip per turn.
 
 ### 6.2 Company FAQ
 
@@ -286,6 +328,11 @@ as the "native CCaaS" story for orgs not already invested in Amazon Connect.
 - [ ] All five use cases pass manual QA in the Agentforce DX preview panel.
 - [ ] Order lookup data graph returns the correct order, line items, and
       customer/product details for at least 2–3 sample orders.
+- [ ] A caller whose ANI matched an Account gets their most recent order without
+      being asked for any identifiers, and is addressed by name.
+- [ ] Every order number/total/status/date the agent says matches core CRM exactly —
+      check the preview traces to confirm the action actually fired rather than the
+      model answering from nothing.
 - [ ] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
       questions per product category worth demoing.
 - [ ] Company FAQ Apex retriever returns grounded answers at lower latency than the

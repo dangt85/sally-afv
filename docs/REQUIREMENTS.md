@@ -174,9 +174,13 @@ ships as a single approach.
    (e.g. Individual, Sales Order, Sales Order Product, Product) — deliberately **not**
    using Data Cloud's built-in Salesforce CRM connector/data kit, so the ingestion and
    mapping mechanics are visible on camera — before building the data graph on top of
-   the mapped objects. The data graph is then added as a native Data Cloud retriever
-   action directly on the `order_lookup` topic; no additional Apex/Flow is needed to
-   invoke it.
+   the mapped objects. The data graph is then queried by an Apex invocable action
+   (`OrderLookupDataGraph`) wired into the `order_lookup` topic. A data graph has **no**
+   no-code retriever action — unlike §5.2/§5.3's search-index retrievers, it is
+   reachable only through the Data Graph Query API — so this stage swaps one Apex
+   action for another, and the interesting change is where the data comes from, not
+   how the topic is wired. See `SETUP_GUIDE.md` §6.1.3 for the constraints that shape
+   the implementation.
 
 ### 5.2 Company FAQ
 
