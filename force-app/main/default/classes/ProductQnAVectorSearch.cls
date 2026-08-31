@@ -62,18 +62,15 @@ public with sharing class ProductQnAVectorSearch {
     input.sql = buildSql(searchQuery);
 
     String queryId;
-    List<ConnectApi.QuerySqlRow> dataRows;
+    Boolean done;
     try {
       ConnectApi.QuerySqlOutput submitResult = ConnectApi.CdpQuery.querySql(
         input
       );
       queryId = submitResult.status.queryId;
-      // A fast query can already be finished by the time querySql returns —
-      // in that case its rows travel on the submit response itself and there
-      // is nothing to poll.
-      if (!STATUS_RUNNING.equals(submitResult.status.completionStatus.name())) {
-        dataRows = submitResult.dataRows;
-      }
+      done = !STATUS_RUNNING.equals(
+        submitResult.status.completionStatus.name()
+      );
     } catch (Exception e) {
       System.debug(
         LoggingLevel.ERROR,
@@ -82,25 +79,35 @@ public with sharing class ProductQnAVectorSearch {
       return result;
     }
 
-    if (dataRows == null) {
+    // A fast query can already be finished by the time querySql returns —
+    // confirmed live that completionStatus can already read ResultsProduced
+    // on the submit response itself, so polling is skipped in that case.
+    // But that same live check also showed submitResult.dataRows isn't
+    // reliably populated even when completionStatus says done (e.g. a
+    // one-row COUNT(*) came back with dataRows null on the submit response),
+    // so rows are always fetched via querySqlRows rather than trusted from
+    // the submit response — the only path confirmed to reliably return them.
+    if (!done) {
       queryId = pollUntilDone(queryId);
       if (queryId == null) {
         return result;
       }
-      try {
-        ConnectApi.QuerySqlPageOutput pageResult = ConnectApi.CdpQuery.querySqlRows(
-          queryId,
-          0,
-          TOP_K
-        );
-        dataRows = pageResult.dataRows;
-      } catch (Exception e) {
-        System.debug(
-          LoggingLevel.ERROR,
-          'querySqlRows failed: ' + e.getMessage()
-        );
-        return result;
-      }
+    }
+
+    List<ConnectApi.QuerySqlRow> dataRows;
+    try {
+      ConnectApi.QuerySqlPageOutput pageResult = ConnectApi.CdpQuery.querySqlRows(
+        queryId,
+        0,
+        TOP_K
+      );
+      dataRows = pageResult.dataRows;
+    } catch (Exception e) {
+      System.debug(
+        LoggingLevel.ERROR,
+        'querySqlRows failed: ' + e.getMessage()
+      );
+      return result;
     }
 
     List<String> excerpts = parseExcerpts(dataRows);
