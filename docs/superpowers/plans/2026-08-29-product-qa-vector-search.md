@@ -63,13 +63,13 @@ Apex, Data Cloud/Data 360 (file-attachment ingestion, hybrid search index,
 
 Guided, hands-on — done together, live, in `sally-prep`'s Data Cloud Setup.
 
-- [ ] **Step 1: Confirm the starting state**
+- [x] **Step 1: Confirm the starting state**
 
 Run: `sf data query --target-org sally-prep --query "SELECT COUNT() FROM ContentVersion WHERE FirstPublishLocationId IN (SELECT Id FROM Product2 WHERE ProductCode != null)"`
 Expected: 13 (the manuals/guides listed in `REQUIREMENTS.md` §3.1). Note this
 number — it's what Step 4 below checks the ingested count against.
 
-- [ ] **Step 2: Deploy the Content Bundle**
+- [x] **Step 2: Deploy the Content Bundle**
 
 Data Cloud Setup → search "Ingest File Attachments from Salesforce CRM
 Objects" (or the equivalent path Data Cloud's Setup search surfaces in this
@@ -81,14 +81,14 @@ and Data Streams for `ContentDocument`, `ContentVersion`, and
 connection (no S3/Azure/GCS involved — this ingests directly from Salesforce
 CRM).
 
-- [ ] **Step 3: Activate the resulting Data Streams**
+- [x] **Step 3: Activate the resulting Data Streams**
 
 Data Cloud → Data Streams. Activate each of the three streams the Content
 Bundle created (`ContentDocument`, `ContentVersion`, `ContentDocumentLink`).
 Give it a few minutes per stream, same as any other Data Stream activation
 (`SETUP_GUIDE.md` §10's ingestion-isn't-instant gotcha applies here too).
 
-- [ ] **Step 4: Verify the backfill risk from spec §1**
+- [x] **Step 4: Verify the backfill risk from spec §1**
 
 This is the step that resolves the open risk in the spec: Salesforce's
 documentation notes the `ContentVersion` stream "ingests only file versions
@@ -110,7 +110,7 @@ count rows. Compare against the 13 from Step 1.
   change is enough to trigger re-ingestion; don't actually alter the PDF
   content). Re-check the count after a few minutes.
 
-- [ ] **Step 5: Confirm `ContentDocumentLink` still ties files to their `Product2` parent**
+- [x] **Step 5: Confirm `ContentDocumentLink` still ties files to their `Product2` parent**
 
 In Data Explorer, spot-check 2–3 ingested `ContentDocumentLink` rows against
 `sf data query --target-org sally-prep --query "SELECT ContentDocumentId, LinkedEntityId FROM ContentDocumentLink WHERE LinkedEntityId IN (SELECT Id FROM Product2 WHERE ProductCode != null) LIMIT 3"`
@@ -123,9 +123,51 @@ No commit for this task — Data Cloud config lives in Data Cloud, not
 
 ### What actually happened
 
-_(Fill in after execution: real Data Stream/DLO names, whether the backfill
-risk from Step 4 materialized and what fixed it if so, final ingested row
-count.)_
+- **Content Bundle path found via Data Cloud Setup search**: "Ingest File
+  Attachments from Salesforce CRM Objects" (exact label matched the plan's
+  assumption). Deploying it created `ContentDocumentLink_Home`,
+  `ContentVersion_Home`, `ContentDocument_Home` alongside the pre-existing
+  `Account_Home`/`Order_Home`/`Product2_Home`/`OrderItem_Home` streams.
+- **`ContentDocumentLink_Home` creation failed** with a generic
+  `"Creation of data stream failed"` error (no more detail available in the
+  UI, even after Retry Now). Root cause, found via Salesforce Help article
+  005227808 ("Data Stream for ContentDocumentLink fails in Data Cloud"): a
+  missing permission on the **"Data Cloud Salesforce Connector"** permission
+  set — App Permissions **"Query Non Vetted Files"** and **"Allow View
+  Knowledge"** were both off. Enabling them fixed it immediately. The
+  article's other two candidate causes (Standard Data Model package
+  version, "Enable Files to be ingested into Data Cloud" setting) were both
+  already fine in `sally-prep` (package v1.132; setting already checked) —
+  not the actual cause here, but worth checking both if this recurs in
+  `sally-demo`.
+- **Backfill risk (spec §1 risk 2) materialized exactly as flagged**:
+  `ContentVersion_Home`/`ContentDocument_Home` both completed a `Success`
+  run but with `Total Records = 0` — the 13 manuals were all loaded before
+  the streams existed, and the streams only ingest post-creation
+  create/update events. "Refresh Now" alone did not fix it (still 0 after a
+  manual refresh). Fixed by running
+  `data/scripts/touch-product-content-versions.apex` against `sally-prep`
+  (re-saves each of the 13 `ContentVersion` records with a real
+  `Description`, previously blank, without touching the PDF content), then
+  a further "Refresh Now" on `ContentVersion_Home` picked up all 13.
+- **Final ingested counts**: `ContentVersion_Home` 13/13,
+  `ContentDocument_Home` 13/13, `ContentDocumentLink_Home` 44/45 (more than
+  13 — a `ContentDocument` can have more than one `ContentDocumentLink` row;
+  not investigated further since it doesn't affect this build, noted here
+  in case a future per-product-filter build needs to account for it).
+- **Design correction, found while investigating this task**: retrieved
+  excerpts still need to be labeled with their source product so the agent
+  can name it in an answer (spec's "no per-product filtering" scope note
+  was too broad — it should cover filtering the search _query_, not
+  labeling _results_). Resolved without depending on
+  `ContentDocumentLink`/`Product2` at all: `ContentVersion.Title` already
+  contains the product name verbatim (e.g. `"Alpine Peak 2 Tent - Setup
+Manual"`, `"BlazeLight Camp Stove - Troubleshooting (Won't Ignite)"` —
+  confirmed via `sf data query` against all 13 records), so Task 3's SQL
+  should select `Title` from the source `ContentVersion` DMO (via the
+  chunk's `SourceRecordId`) and prefix each excerpt with it.
+  `ContentDocumentLink_Home` is fixed and ingesting now regardless, so it's
+  available if a future per-product filter needs it.
 
 ---
 
@@ -517,7 +559,7 @@ matching `SETUP_GUIDE.md`'s before/after framing (spec §5).
 - [ ] **Step 1: Confirm the "before" behavior is on record**
 
 If not already captured earlier in this build, note (for the demo) what
-`product_qa` said for 1–2 questions *before* Task 4's wiring — generic,
+`product_qa` said for 1–2 questions _before_ Task 4's wiring — generic,
 possibly asking the caller for details it should be able to look up. If
 Task 4 is already deployed, this step is a skip — just note that the
 before/after contrast was captured live during Task 4 Step 5 instead.
