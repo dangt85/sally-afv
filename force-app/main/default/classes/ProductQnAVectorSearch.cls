@@ -119,34 +119,27 @@ public with sharing class ProductQnAVectorSearch {
   }
 
   private static String buildSql(String searchQuery) {
-    // TEMPORARY: Compass_Product_QnA's search index was accidentally built
-    // as pure Vector rather than Hybrid, so hybrid_search() currently fails
-    // with a KEYWORD_INDEX_CONNECTION_DETAILS error (a Data Cloud config
-    // issue, not an app bug). It's being rebuilt as Hybrid; until that's
-    // confirmed, this targets vector_search() as a stand-in with the same
-    // join/poll/parsing logic below. Swap back once the rebuild lands:
-    //   SELECT c.Chunk__c, h.hybrid_score__c
-    //   FROM hybrid_search(table(<INDEX_TABLE>), '<query>', '', <TOP_K>,
-    //     '{ "min_should_match": "-100%"}') AS h
-    //   JOIN <CHUNK_TABLE> AS c ON h.SourceRecordId__c = c.RecordId__c
-    //   ORDER BY h.hybrid_score__c DESC LIMIT <TOP_K>
+    // Compass_Product_QnA's search index is confirmed rebuilt as Hybrid
+    // (searchType HYBRID), so hybrid_search() is the real query here.
     //
     // This is Data Cloud's ANSI-SQL query layer, which escapes a literal
     // single quote by doubling it — unlike SOQL/SOSL's backslash escaping,
     // so String.escapeSingleQuotes (backslash-based) doesn't work here and
     // was confirmed live to break on an apostrophe ("won't") with a SQL
     // syntax error.
-    return 'SELECT c.Chunk__c ' +
-      'FROM vector_search(table(' +
+    return 'SELECT c.Chunk__c, h.hybrid_score__c ' +
+      'FROM hybrid_search(table(' +
       INDEX_TABLE +
       '), \'' +
       searchQuery.replace('\'', '\'\'') +
       '\', \'\', ' +
       TOP_K +
-      ') AS h ' +
+      ', \'{ "min_should_match": "-100%"}\') AS h ' +
       'JOIN ' +
       CHUNK_TABLE +
-      ' AS c ON h.SourceRecordId__c = c.RecordId__c';
+      ' AS c ON h.SourceRecordId__c = c.RecordId__c ' +
+      'ORDER BY h.hybrid_score__c DESC LIMIT ' +
+      TOP_K;
   }
 
   // querySqlStatus takes only a queryId and has no server-side wait
@@ -198,7 +191,9 @@ public with sharing class ProductQnAVectorSearch {
   // ConnectApi.QuerySqlRow is a proper ConnectApi output class here (unlike
   // the data graph's raw Gson-map rows in OrderLookupDataGraph) — its `row`
   // field is a real List<Object> that direct indexing works safely against.
-  // buildSql's SELECT list has a single column, c.Chunk__c, at index 0.
+  // buildSql's SELECT list is `c.Chunk__c, h.hybrid_score__c` — confirmed
+  // live via QuerySqlPageOutput.metadata that column order is preserved, so
+  // the chunk text is always at index 0; the score isn't currently needed.
   private static List<String> parseExcerpts(
     List<ConnectApi.QuerySqlRow> dataRows
   ) {
