@@ -307,9 +307,96 @@ moving to the next.
 
 ### 6.3 Product Q&A
 
-A custom Apex action queries Data Cloud's vector search index directly over the
-`Product2` records' linked `ContentVersion` manuals/guides — no data graph, no Prompt
-Template retriever, single approach.
+A custom Apex action (`ProductQnAVectorSearch`) queries a Data Cloud **hybrid**
+search index directly over the product manual/guide `ContentVersion` files linked to
+each `Product2` record — no data graph, no Prompt Template retriever, single
+approach. Build in two parts:
+
+1. **Ingest the manuals into Data Cloud** — Data Cloud Setup → "Ingest File
+   Attachments from Salesforce CRM Objects" (exact label may vary by release), which
+   deploys a standard Content Bundle: Data Lake Objects/Data Model Objects/Data
+   Streams for `ContentDocument`, `ContentVersion`, and `ContentDocumentLink`
+   (`ContentDocument_Home`, `ContentVersion_Home`, `ContentDocumentLink_Home` in this
+   build). Activate all three streams and give them a few minutes.
+
+   **Backfill gotcha, confirmed:** the `ContentVersion` stream only ingests versions
+   created or updated _after_ the stream exists — every manual PDF here predates it.
+   `Refresh Now` didn't backfill; the fix was a no-op re-save of each `ContentVersion`
+   (`data/scripts/touch-product-content-versions.apex`) to trigger the incremental
+   stream. `ContentDocumentLink_Home` separately needed the Data Cloud Salesforce
+   Connector permission set's "Query Non Vetted Files" + "Allow View Knowledge"
+   enabled before it would ingest without erroring.
+
+2. **Build a Hybrid search index** over the ingested `ssot__ContentDocumentVersion__dlm`
+   DMO — Data Cloud → Search Index → New. **Select Hybrid Search, not Vector Search**
+   (the wizard defaults to Vector selected): pure vector search under-ranks the exact
+   troubleshooting phrases these manuals hinge on ("won't ignite," "leaking seams"),
+   and a vector-only index has no keyword index to fall back to at all — querying it
+   with `hybrid_search()` fails outright with a `KEYWORD_INDEX_CONNECTION_DETAILS`
+   error, it doesn't just degrade to weaker ranking. This is easy to
+   get wrong live since the wizard doesn't warn you either way. Rebuilding the index
+   from Vector to Hybrid re-runs the entire chunk/embed/keyword-index pipeline from
+   scratch (another 15-35 minute wait on this data volume, not instant).
+
+   Building the index creates 4 additional DMOs, named `<index name>_index__dlm`,
+   `_chunk__dlm`, `_transcribe__dlm` (unused here — audio/video only), and
+   `_centr__dlm` (vector cluster centroids, not queried directly). None of these are
+   visible via standard SOQL/`describeGlobal` — they're Data Lake-backed, queryable
+   only through the CDP query API's ANSI SQL, which is exactly why `queryAnsiSqlV2`/
+   `querySql` exists as a separate code path from ordinary Apex SOQL.
+
+**Apex** (`ProductQnAVectorSearch.cls`) queries the index via the async
+`ConnectApi.CdpQuery.querySql`/`querySqlStatus`/`querySqlRows`/`cancelQuerySql` API
+(not `queryAnsiSqlV2`) specifically for its timeout/cancel handling, so a slow query
+can't leave a live voice call hanging. Confirmed shapes and gotchas, empirically
+(Salesforce's reference docs cover the REST shape, not a concrete Apex parsing
+example):
+
+- `ConnectApi.CdpQuery.querySql(QuerySqlInput)` returns `QuerySqlOutput`; the
+  `queryId` is nested at `output.status.queryId`, not a top-level field.
+  `completionStatus` (a `QuerySqlStatusEnum`) reads `ResultsProduced` immediately on
+  the submit call for most queries at this data volume — polling is the exception,
+  not the rule, but the bounded loop still matters for the case it isn't.
+- **`output.dataRows` is not reliably populated even when `completionStatus` reports
+  done** — confirmed with a one-row `COUNT(*)` that came back with `dataRows: null`
+  on the submit response, correct only via a follow-up `querySqlRows` call. Always
+  fetch rows via `querySqlRows(queryId, 0, limit)` once the query is done, whether
+  "done" arrived on the initial submit or after polling — never trust the submit
+  response's own `dataRows`.
+- `querySqlStatus(queryId)` takes a single argument — no server-side wait parameter.
+  Apex has no synchronous sleep primitive, and a spin-wait against
+  `System.currentTimeMillis()` burns real CPU-governor time rather than suspending
+  (unlike a callout), risking an uncatchable CPU-limit abort instead of graceful
+  degradation. `pollUntilDone` retries `querySqlStatus` back-to-back with no
+  artificial delay, relying on each call's own real round-trip latency for pacing.
+- `ConnectApi.QuerySqlRow` (from either `QuerySqlOutput.dataRows` or
+  `QuerySqlPageOutput.dataRows`) is a proper ConnectApi output class — its `.row`
+  field is a real `List<Object>`, safe to index directly. This is **not** the data
+  graph's raw Java/Gson-map gotcha (§6.1.3) — don't port that string-cutting
+  workaround here, it solves a problem this API doesn't have.
+- The `hybrid_search()`/`vector_search()` join is on the result's
+  `SourceRecordId__c` matching the chunk table's `RecordId__c` (the index row's own
+  `RecordId__c` is its own vector-record id, not a pointer to the chunk — easy to
+  get backwards).
+- Data Cloud's ANSI-SQL layer escapes a literal single quote by **doubling** it
+  (`''`), not backslash-escaping — `String.escapeSingleQuotes()` (SOQL/SOSL
+  convention) does not work here and breaks on any caller input with an apostrophe
+  ("won't," "can't") with a SQL syntax error, not a clean failure.
+- `ContentFound = true` means the query returned rows, not that they're relevant —
+  vector/hybrid search has no similarity threshold and always returns its top-K
+  nearest results. An out-of-catalog question ("how do I fix my kayak paddle") still
+  came back `ContentFound: true` with the closest semantic match (a tent's pole-repair
+  steps). The graceful "I don't have that" behavior comes from `product_qa`'s
+  reasoning instructions judging the retrieved content isn't actually relevant to the
+  question, not from the boolean flag alone — the flag and the instruction-level
+  relevance check both have to be doing their job.
+- **The Apex class needs an explicit `classAccesses` grant** in
+  `Cairn_Voice_Agent.permissionset-meta.xml` for the agent's running user, same as
+  any other `apex://` action target — missing it doesn't error, it silently withholds
+  the action from the LLM (`NO_USER_ACCESS` in the trace) and looks exactly like the
+  model just deciding to escalate instead of searching. Check the trace's
+  `EnabledToolsStep`/`runtime_withheld_actions`, not just the transcript, if an action
+  never seems to fire.
 
 What "good" looks like here is a clear before/after: without grounding, the agent
 gives a generic answer and asks the caller for details it should already be able to
@@ -347,7 +434,7 @@ as the "native CCaaS" story for orgs not already invested in Amazon Connect.
 - [ ] Every order number/total/status/date the agent says matches core CRM exactly —
       check the preview traces to confirm the action actually fired rather than the
       model answering from nothing.
-- [ ] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
+- [x] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
       questions per product category worth demoing.
 - [ ] Company FAQ Apex retriever returns grounded answers at lower latency than the
       Prompt Template baseline for at least 2–3 sample questions.
@@ -409,6 +496,23 @@ Repeat, from a clean sandbox, on camera:
   lookup — `Account`/`Order`/`OrderItem`/`Product2` fields are mapped to Data Cloud's
   Standard Data Model by hand (§6.1) — double-check the mapping after any Data Cloud
   org refresh/reset.
+- A Data Cloud search index built to link an unstructured DMO (e.g.
+  `ContentDocumentLink` → a structured DMO for file attachments) needs the linking
+  DLO's own primary key mapped into the target DMO too, separately from whatever
+  business-key mapping actually does the linking — "Primary key of all source DLOs
+  must be mapped to the source DMO" at Save time means exactly this, usually on a
+  DLO you didn't think of as a "real" data source (see §6.3).
+- The Search Index Builder wizard defaults to Vector Search selected, not Hybrid —
+  easy to build the wrong one without noticing, and there's no in-place edit, only a
+  full rebuild (another full chunk/embed/index cycle) to fix it (§6.3).
+- `ContentVersion`'s Data Cloud stream only ingests versions created/updated _after_
+  the stream exists — pre-existing files need a no-op re-save to backfill (§6.3, same
+  underlying behavior `SETUP_GUIDE.md` already notes for order lookup above, just a
+  file-attachment-specific instance of it).
+- Any new `apex://` action target needs an explicit `classAccesses` grant in
+  `Cairn_Voice_Agent.permissionset-meta.xml` — missing it silently withholds the
+  action from the LLM (`NO_USER_ACCESS`) rather than erroring, and looks identical to
+  the model just choosing not to call it (§6.3).
 
 ## 11. References
 

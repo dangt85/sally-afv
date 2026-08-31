@@ -203,10 +203,13 @@ ships as a single approach.
 
 ### 5.3 Product Q&A
 
-**Custom Apex vector-search retriever** — a single approach: a custom Apex action
-queries Data Cloud's vector search index directly over the product catalog's linked
-manual/how-to content (§3.1), grounding answers in the actual PDF content rather than
-free-form generation. No data graph is used for this use case.
+**Custom Apex hybrid-search retriever** — a single approach: a custom Apex action
+queries a Data Cloud **hybrid** (keyword + vector) search index directly over the
+product catalog's linked manual/how-to content (§3.1), grounding answers in the
+actual PDF content rather than free-form generation. Hybrid, not pure vector, so
+exact troubleshooting phrases ("won't ignite," "leaking seams") aren't under-ranked
+by semantic similarity alone — see `SETUP_GUIDE.md` §6.3 for the build detail and
+the "the wizard defaults to Vector" gotcha. No data graph is used for this use case.
 
 ## 6. Voice Channel: Telephony Approach
 

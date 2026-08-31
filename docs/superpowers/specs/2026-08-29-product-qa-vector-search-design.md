@@ -115,16 +115,16 @@ Out of scope for this spec:
 - **Query flow**, using the `querySql` async API (chosen over
   `queryAnsiSqlV2` specifically for its timeout/cancel handling, which a
   live voice call needs):
-  1. Build the SQL: `hybrid_search(table(Compass_Product_QA_Index__dlm),
-     '<SearchQueryInput>', ...)` joined to the chunk DMO, ordered by
+  1. Build the SQL: `hybrid_search(...)` against the index DMO with the
+     caller's question, joined to the chunk DMO, ordered by
      `hybrid_score__c desc`, `LIMIT 3` (top-K starting point).
   2. Submit via `ConnectApi.CdpQuery.querySql(QuerySqlInput)` → get back a
      `queryId`.
   3. Poll `ConnectApi.CdpQuery.querySqlStatus(queryId, waitTimeMs)` in a
      bounded loop — `waitTimeMs = 2000`, max 3 iterations (~6s total
      budget). Stop polling once status reports done.
-  4. On success: fetch rows via `ConnectApi.CdpQuery.querySqlRows(queryId,
-     0, 3)` and flatten into the response (see below). The exact row/column
+  4. On success: fetch rows via `querySqlRows(queryId, 0, 3)` and flatten
+     into the response (see below). The exact row/column
      shape `querySqlRows` returns isn't nailed down from documentation alone
      (Salesforce's reference material covers the REST shape, not a concrete
      Apex parsing example) — confirmed empirically against `sally-prep`
