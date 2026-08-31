@@ -249,28 +249,47 @@ subagent company_faq:
 subagent product_qa:
     label: "Product Q&A"
     description: "Answers product questions — specs, compatibility, troubleshooting, and how-tos — for Cairn's catalog: tents, packs, stoves, filters, sleeping bags, headlamps, boots, and camp furniture."
-    # PLACEHOLDER: no live grounding action yet (Data Cloud dependency, out of
-    # scope for this build). A future action named product_qa_retriever will
-    # ground these answers once that infrastructure exists — for now this
-    # subagent reasons from general knowledge of these product categories.
 
     before_reasoning:
         set @variables.queue_target = "Customer_Support"
 
     reasoning:
         instructions: |
-            Answer the caller's product question using your general
-            knowledge of specs, compatibility, troubleshooting, and how-tos
-            for tents, packs, stoves, filters, sleeping bags, headlamps,
-            boots, and camp furniture.
-            Give the headline answer first, then offer more detail only if
-            asked.
-            If you can't resolve the question this way, hand the caller off
-            to a specialist rather than guessing.
+            Answer the caller's product question by first calling
+            search_product_content with their question, as close to
+            verbatim as reasonable.
+            Say something short while it runs, since it isn't instant.
+            If it finds relevant content, ground your answer only in what
+            it returned — cite the specific spec or troubleshooting step
+            rather than a generic response. Give the headline answer first,
+            then offer more detail only if asked.
+            If it finds nothing relevant, don't fall back to general
+            knowledge or guess — say you don't have that specific
+            information and hand the caller off to a specialist instead.
+            Never state a product detail you haven't actually gotten from
+            search_product_content.
 
         actions:
+            search_product_content: @actions.product_qa_action
+                description: "Search the product manuals/guides for content relevant to the caller's question. Returns whether anything relevant was found and, if so, the retrieved excerpts to ground the answer in."
+                with SearchQueryInput = ...
             hand_off_to_specialist: @utils.transition to @subagent.escalate_to_agent
                 description: "Connect the caller with a specialist when you can't resolve their product question."
+
+    actions:
+        product_qa_action:
+            description: "Search the product manuals/guides for content relevant to the caller's question. Returns whether anything relevant was found and, if so, the retrieved excerpts to ground the answer in."
+            target: "apex://ProductQnAVectorSearch"
+            inputs:
+                SearchQueryInput: string
+                    description: "The caller's product question, as close to verbatim as reasonable."
+            outputs:
+                ContentFound: boolean
+                    description: "Whether any relevant content was found."
+                    is_displayable: True
+                RetrievedContextOutput: string
+                    description: "Retrieved excerpts from product manuals/guides relevant to the question."
+                    is_displayable: True
 
 subagent escalate_to_agent:
     label: "Escalate to Agent"
