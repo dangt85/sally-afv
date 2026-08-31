@@ -283,6 +283,7 @@ subagent product_qa:
             inputs:
                 SearchQueryInput: string
                     description: "The caller's product question, as close to verbatim as reasonable."
+                    is_required: True
             outputs:
                 ContentFound: boolean
                     description: "Whether any relevant content was found."

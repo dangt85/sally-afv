@@ -3,6 +3,12 @@
  * over product manual content. See SETUP_GUIDE.md §6.3 — queried via the
  * async querySql API (not queryAnsiSqlV2) so a slow/stuck query can be
  * bounded and cancelled rather than leaving a live call hanging.
+ *
+ * Naming note: this class predates a mid-build design correction from a
+ * pure vector-search index to a hybrid one (see SETUP_GUIDE.md §6.3) — it
+ * queries hybrid_search(), not vector_search(), despite the class name.
+ * Not renamed since that would ripple through the permission set, the
+ * .agent file, and this doc for no functional gain.
  */
 public with sharing class ProductQnAVectorSearch {
   // Search index and its chunk DMO. The join is on the index row's
@@ -12,16 +18,44 @@ public with sharing class ProductQnAVectorSearch {
   // live vector_search() probe returning real chunk content with this join,
   // and by Salesforce's own published example queries for this function
   // family. See Task 2 / SETUP_GUIDE.md §6.3 for how these DMOs were built.
+  //
+  // Both DLM names derive from the search index's required name,
+  // Compass_Product_QnA (<index name>_index__dlm / _chunk__dlm) — see
+  // SETUP_GUIDE.md §6.3 step 2.
   private static final String INDEX_TABLE = 'Compass_Product_QnA_index__dlm';
   private static final String CHUNK_TABLE = 'Compass_Product_QnA_chunk__dlm';
+
+  // The chunk table's SecondarySourceRecordId__c (NOT SourceRecordId__c,
+  // which is populated but useless here — confirmed live it holds a constant
+  // User Id, apparently CreatedById, identical across every manual-PDF
+  // chunk) points to the source ContentVersion whose PDF the chunk came
+  // from. Confirmed live: joining it to ssot__ContentDocumentVersion__dlm's
+  // primary key (ssot__Id__c) and pulling ssot__Title__c returns real,
+  // sensible titles (e.g. a StreamPure Water Filter chunk joins to "StreamPure
+  // Water Filter - Cleaning / Backwashing How-To"). A LEFT JOIN is used
+  // (rather than an inner join) because the index's source DMO is
+  // ssot__Product__dlm as well as this attachment DMO — a chunk sourced
+  // from Product2 fields directly would have a null
+  // SecondarySourceRecordId__c and must not be silently dropped just
+  // because it doesn't have a manual title.
+  private static final String CONTENT_VERSION_TABLE = 'ssot__ContentDocumentVersion__dlm';
+
   private static final Integer TOP_K = 3;
   private static final Integer MAX_POLLS = 3;
 
+  // Caller-supplied search text is embedded directly into the SQL literal
+  // below (after apostrophe-doubling) with no length limit otherwise — a
+  // long, rambling voice-transcribed utterance would go straight into the
+  // query. Capped defensively; see buildSql.
+  private static final Integer MAX_QUERY_LENGTH = 400;
+
   // ConnectApi.QuerySqlStatus.completionStatus values observed live against
-  // this org: 'Running' while the async query is still working, 'Finished'
-  // once dataRows are ready. Treat anything other than 'Running' as done
-  // rather than allow-listing every terminal value, in case a status this
-  // org hasn't produced yet (e.g. a failure state) shows up later.
+  // this org: 'Running' while the async query is still working,
+  // 'ResultsProduced' once dataRows are ready (there may be other terminal
+  // values this org hasn't produced yet, e.g. a failure state). Treat
+  // anything other than 'Running' as done rather than allow-listing every
+  // terminal value, so an as-yet-unseen one still degrades gracefully
+  // instead of being mistaken for still-running.
   private static final String STATUS_RUNNING = 'Running';
 
   public class Request {
@@ -126,18 +160,33 @@ public with sharing class ProductQnAVectorSearch {
     // single quote by doubling it — unlike SOQL/SOSL's backslash escaping,
     // so String.escapeSingleQuotes (backslash-based) doesn't work here and
     // was confirmed live to break on an apostrophe ("won't") with a SQL
-    // syntax error.
-    return 'SELECT c.Chunk__c, h.hybrid_score__c ' +
+    // syntax error. This dialect also doesn't treat backslash as an escape
+    // character at all, so backslash-based SOQL/SOSL escaping conventions
+    // simply don't apply here — doubling is the only escaping this layer
+    // needs or supports.
+    String safeQuery = searchQuery.left(MAX_QUERY_LENGTH).replace('\'', '\'\'');
+
+    // '-100%' as hybrid_search's min_should_match means the keyword-search
+    // (BM25) arm requires zero query terms to match — i.e. it never filters
+    // rows out on its own. This maximizes recall and keeps BM25 as one input
+    // to the fusion rank alongside the vector-similarity arm, rather than a
+    // hard keyword filter. This does NOT disable the keyword arm — the
+    // fusion ranking still blends both scores; a reader shouldn't assume
+    // "-100%" turns hybrid search back into pure vector search.
+    return 'SELECT c.Chunk__c, v.ssot__Title__c, h.hybrid_score__c ' +
       'FROM hybrid_search(table(' +
       INDEX_TABLE +
       '), \'' +
-      searchQuery.replace('\'', '\'\'') +
+      safeQuery +
       '\', \'\', ' +
       TOP_K +
       ', \'{ "min_should_match": "-100%"}\') AS h ' +
       'JOIN ' +
       CHUNK_TABLE +
       ' AS c ON h.SourceRecordId__c = c.RecordId__c ' +
+      'LEFT JOIN ' +
+      CONTENT_VERSION_TABLE +
+      ' AS v ON c.SecondarySourceRecordId__c = v.ssot__Id__c ' +
       'ORDER BY h.hybrid_score__c DESC LIMIT ' +
       TOP_K;
   }
@@ -191,9 +240,18 @@ public with sharing class ProductQnAVectorSearch {
   // ConnectApi.QuerySqlRow is a proper ConnectApi output class here (unlike
   // the data graph's raw Gson-map rows in OrderLookupDataGraph) — its `row`
   // field is a real List<Object> that direct indexing works safely against.
-  // buildSql's SELECT list is `c.Chunk__c, h.hybrid_score__c` — confirmed
-  // live via QuerySqlPageOutput.metadata that column order is preserved, so
-  // the chunk text is always at index 0; the score isn't currently needed.
+  // buildSql's SELECT list is `c.Chunk__c, v.ssot__Title__c,
+  // h.hybrid_score__c` — confirmed live via QuerySqlPageOutput.metadata that
+  // column order is preserved, so the chunk text is always at index 0 and
+  // the manual title at index 1; the score isn't currently needed.
+  //
+  // Each excerpt is prefixed with its source manual's title so the reasoning
+  // LLM (and a human reading the trace) can tell which product/manual it
+  // came from — with TOP_K=3 and no per-product filter, the 3 excerpts can
+  // otherwise come from 3 different products with no signal which is which.
+  // Title can be null (the LEFT JOIN — see CONTENT_VERSION_TABLE comment
+  // above), in which case the chunk is still returned, just unlabeled,
+  // rather than dropped.
   private static List<String> parseExcerpts(
     List<ConnectApi.QuerySqlRow> dataRows
   ) {
@@ -206,9 +264,11 @@ public with sharing class ProductQnAVectorSearch {
         continue;
       }
       String chunk = asString(dataRow.row[0]);
-      if (String.isNotBlank(chunk)) {
-        excerpts.add(chunk);
+      if (String.isBlank(chunk)) {
+        continue;
       }
+      String title = dataRow.row.size() > 1 ? asString(dataRow.row[1]) : null;
+      excerpts.add(String.isNotBlank(title) ? title + ': ' + chunk : chunk);
     }
     return excerpts;
   }

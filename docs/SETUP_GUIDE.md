@@ -328,7 +328,15 @@ approach. Build in two parts:
    enabled before it would ingest without erroring.
 
 2. **Build a Hybrid search index** over the ingested `ssot__ContentDocumentVersion__dlm`
-   DMO — Data Cloud → Search Index → New. **Select Hybrid Search, not Vector Search**
+   DMO — Data Cloud → Search Index → New. **Name it exactly `Compass_Product_QnA`** —
+   `ProductQnAVectorSearch.cls`'s `INDEX_TABLE`/`CHUNK_TABLE` constants
+   (`Compass_Product_QnA_index__dlm`/`Compass_Product_QnA_chunk__dlm`) are derived
+   from this name and are hardcoded, not configurable; a different name here means
+   those DLMs won't exist under the names the class queries. The failure is silent
+   from the caller's perspective — `querySql` throws, the class catches it and
+   returns `ContentFound=false`, and the agent just says "I don't have that" and
+   escalates, which looks like the feature doesn't work rather than a naming
+   mismatch. **Select Hybrid Search, not Vector Search**
    (the wizard defaults to Vector selected): pure vector search under-ranks the exact
    troubleshooting phrases these manuals hinge on ("won't ignite," "leaking seams"),
    and a vector-only index has no keyword index to fall back to at all — querying it
@@ -378,6 +386,18 @@ example):
   `SourceRecordId__c` matching the chunk table's `RecordId__c` (the index row's own
   `RecordId__c` is its own vector-record id, not a pointer to the chunk — easy to
   get backwards).
+- **Labeling each excerpt with its source manual's title** requires a second join,
+  and the obvious field is a trap: the chunk table's own `SourceRecordId__c` looks
+  like it should point back to the source `ContentVersion`, but confirmed live it's
+  populated with a constant value (a User Id, apparently `CreatedById`) identical
+  across every manual-PDF chunk — useless as a join key. The real pointer is the
+  chunk table's `SecondarySourceRecordId__c`, confirmed live to equal
+  `ssot__ContentDocumentVersion__dlm.ssot__Id__c` (its primary key) and to resolve
+  to the correct, sensible title for the chunk's content. Use a `LEFT JOIN` here,
+  not an inner join — the index's declared source DMO is `ssot__Product__dlm` as
+  well as this attachment DMO, so a chunk sourced from Product2 fields directly
+  (rather than a manual PDF) has a null `SecondarySourceRecordId__c` and must not be
+  dropped just because it has no manual title.
 - Data Cloud's ANSI-SQL layer escapes a literal single quote by **doubling** it
   (`''`), not backslash-escaping — `String.escapeSingleQuotes()` (SOQL/SOSL
   convention) does not work here and breaks on any caller input with an apostrophe
@@ -397,6 +417,10 @@ example):
   model just deciding to escalate instead of searching. Check the trace's
   `EnabledToolsStep`/`runtime_withheld_actions`, not just the transcript, if an action
   never seems to fire.
+
+No Apex test class exists for this or `OrderLookupDataGraph` (§6.1.3) — `ConnectApi`
+static methods can't be mocked with `Test.setMock`, so both are verified via live
+anonymous Apex plus `sf agent preview` traces instead of unit tests.
 
 What "good" looks like here is a clear before/after: without grounding, the agent
 gives a generic answer and asks the caller for details it should already be able to
