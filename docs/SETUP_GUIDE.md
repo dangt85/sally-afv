@@ -296,14 +296,62 @@ moving to the next.
 
 ### 6.2 Company FAQ
 
-1. **Prompt Template + Data Cloud retriever** — a Prompt Template action with a
-   built-in Data Cloud/Knowledge retriever grounded on the Knowledge articles
-   published in §4.1 step 6. Baseline version of `company_faq`.
-2. **Custom Apex vector-search retriever** — replace the Prompt Template's retriever
-   call with a custom Apex action that queries Data Cloud's vector search index
-   directly over the Knowledge article content, skipping the Prompt Template
-   retriever's orchestration overhead. Demo this as a before/after latency comparison
-   against stage 1.
+1. **Agentforce Data Library (ADL) + standard "Answer Questions with Knowledge"
+   action** — built as an ADL (`Cairn_Knowledge`) over the Knowledge articles
+   published in §4.1 step 6, using Salesforce's out-of-the-box retriever/action
+   rather than a hand-built Prompt Template. Baseline version of `company_faq`.
+   - **Field selection**: content fields (what gets embedded/searched) —
+     `FAQ_Question__c`, `FAQ_Answer__c`, `Chat_Answer__c`. Include the question
+     field, not just the answer — a caller's spoken query semantically matches
+     the stored question much more closely than the answer text alone.
+     Identifying fields (metadata for citation/labeling, not embedded) —
+     `Title`, `ArticleNumber`.
+   - **Wiring gotcha, confirmed**: adding the ADL in Agent Builder generates the
+     `AnswerQuestionsWithKnowledge` action in the `.agent` file automatically,
+     but the agent's Data section may not offer a way to actually assign the
+     ADL to the agent (no add/plus control) — this looks like a UI gap for the
+     current release, not something specific to this agent. Confirmed via
+     `sf agent adl get` that the ADL can be `READY` with a real retriever and
+     still show an empty `featureAssignments` list, which produces this exact
+     runtime error when the action fires: `REQUIRED_FIELD_MISSING: We
+couldn't find a data library assigned to this agent.` The `sf agent adl`
+     command group has no flag for this assignment either.
+     **Fix**: wire it directly in Agent Script with a top-level `knowledge:`
+     block (sibling to `system:`/`language:`/`variables:`):
+     ```
+     knowledge:
+         rag_feature_config_id: "ARFPC_<the ADL's libraryId>"
+         citations_enabled: True
+         citations_url: ""
+     ```
+     The libraryId comes from `sf agent adl list --target-org sally-prep`
+     (18-char id, `1JD` prefix) — `rag_feature_config_id` is literally
+     `"ARFPC_"` prefixed onto it, not a separately-queryable record. Once this
+     block exists, the action definition's `"ragFeatureConfigId":
+string=@knowledge.rag_feature_config_id` (and the `citationsUrl`/
+     `citationsEnabled` equivalents) resolve correctly — without it, the
+     compiler rejects those same expressions with `Unknown @knowledge field`,
+     since `@knowledge.*` references this block, not a system-wide namespace.
+   - **Retrieve round-trip bug, confirmed**: pulling the bundle after an
+     Agent Builder UI save can corrupt `additional_locales: ""` into an
+     unindented, invalid two-line form (`additional_locales:` then `""` on
+     its own line at column 0), which cascades into several unrelated parse
+     errors below it. `sf agent validate authoring-bundle --target-org
+sally-prep` catches this — fix by putting the value back on one line.
+   - **Permission set gotcha, confirmed**: same category as the
+     `classAccesses` gap in §6.3 for Apex actions, but for Knowledge field
+     access — without `Knowledge__kav` object read plus field read on
+     `FAQ_Question__c`/`FAQ_Answer__c`/`Chat_Answer__c` in
+     `Cairn_Voice_Agent.permissionset-meta.xml`, the action fails with
+     `INSUFFICIENT_ACCESS_OR_READONLY: Looks like you don't have access to
+one or more fields used by the assigned data library.` — a different
+     error from the missing-assignment one above, easy to conflate if you
+     only read the first line.
+2. **Custom Apex vector-search retriever** — replace the standard
+   "Answer Questions with Knowledge" action with a custom Apex action that
+   queries Data Cloud's vector search index directly over the Knowledge
+   article content, skipping the standard action's orchestration overhead.
+   Demo this as a before/after latency comparison against stage 1.
 
 ### 6.3 Product Q&A
 
@@ -537,6 +585,14 @@ Repeat, from a clean sandbox, on camera:
   `Cairn_Voice_Agent.permissionset-meta.xml` — missing it silently withholds the
   action from the LLM (`NO_USER_ACCESS`) rather than erroring, and looks identical to
   the model just choosing not to call it (§6.3).
+- An Agentforce Data Library can be `READY` with a real retriever and still not be
+  assigned to any agent (Agent Builder's Data-section UI may not offer a way to do
+  this) — wire it directly with a top-level `knowledge:` block in Agent Script
+  instead (§6.2).
+- The standard "Answer Questions with Knowledge" action needs its own field-level
+  security grant (`Knowledge__kav` read + the specific content fields) in
+  `Cairn_Voice_Agent.permissionset-meta.xml`, same category as the `classAccesses`
+  gotcha above but for Knowledge fields, not Apex classes (§6.2).
 
 ## 11. References
 
