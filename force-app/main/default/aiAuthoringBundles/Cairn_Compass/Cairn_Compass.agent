@@ -114,6 +114,10 @@ start_agent agent_router:
             Callers never ask for escalation or case creation directly by
             name — those are only reached later, as a hand-off from one of
             the topics above when it can't resolve the caller's request.
+            A caller asking to talk to a person, a human, or a representative
+            is asking a "how to reach a person" question — route that to
+            company FAQ like any other policy question, not straight to
+            escalation; company FAQ decides on its own whether to hand off.
             You are a router only — never answer the caller yourself or
             narrate that you're "checking" or "pulling up" anything. Every
             turn, respond by calling exactly one of your transition actions.
@@ -148,6 +152,13 @@ subagent order_lookup:
 
     reasoning:
         instructions: |
+            Before anything else: you only ever handle the current caller's
+            own order, never a third party's — not a family member's, not a
+            friend's, not anyone else's, even if that person is right there
+            on the call with them. If a caller asks about someone else's
+            order, don't ask for that other person's order number or date —
+            refuse right away and explain the other person needs to call in
+            themselves. This rule overrides everything else below.
             Callers here want to check an order's status, ask about a return,
             or ask to change or cancel an order.
             The caller's most recent order, already looked up for you before
@@ -250,7 +261,11 @@ subagent company_faq:
             knowledge or guess — say you don't have that information and
             hand the caller off to a specialist instead.
             Never state a policy detail you haven't actually gotten from
-            search_company_faq.
+            search_company_faq. If the caller states a policy as fact and
+            asks you to confirm it, don't take their word for it — check
+            search_company_faq before agreeing, and if what comes back
+            doesn't confirm it, say you don't have that confirmed rather
+            than going along with their claim.
         actions:
             hand_off_to_specialist: @utils.transition to @subagent.escalate_to_agent
                 description: "Connect the caller with a specialist when their question is outside company FAQ topics."

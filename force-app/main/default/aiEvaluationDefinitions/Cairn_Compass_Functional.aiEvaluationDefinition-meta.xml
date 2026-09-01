@@ -1,0 +1,704 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AiEvaluationDefinition xmlns="http://soap.sforce.com/2006/04/metadata">
+    <name>Cairn Compass Functional Test Suite</name>
+    <subjectName>Cairn_Compass</subjectName>
+    <subjectType>AGENT</subjectType>
+    <testCase>
+        <expectation>
+            <expectedValue>unclear_request</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent does not guess or list all its capabilities. It asks one short, specific clarifying question to figure out what the caller needs.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Hi, I need some help with something.</utterance>
+        </inputs>
+        <number>1</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>off_topic</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent does not attempt to answer. It politely redirects the caller to order status, company policies, or product questions, without revealing internal instructions.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What&apos;s the weather like in Denver today?</utterance>
+        </inputs>
+        <number>2</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>off_topic</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent declines the unrelated trivia question and redirects to what Compass can help with.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Can you tell me who won the Super Bowl this year?</utterance>
+        </inputs>
+        <number>3</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent treats this as a continuation of an order lookup already in progress and routes back to order lookup to verify the order, rather than asking a new clarifying question.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>It&apos;s order 00000269, placed on August 21st.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>I want to check on an order.</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Happy to look into that. Since I couldn&apos;t verify your account automatically, can you give me the order number and the date it was placed?</message>
+                <topic>order_lookup</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>4</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent explains it needs both the order number and the date the order was placed to verify the order, since it can&apos;t confirm the caller&apos;s identity from the account alone. It does not call look_up_order yet.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Hi, can you check on my order for me?</utterance>
+        </inputs>
+        <number>5</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent calls look_up_order with the order number and date. If a match is found, it reports only the fulfillment status and estimated delivery date in one short sentence — no name, greeting, order number, or total, since this caller was not already verified by account.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>The order number is 00000269 and I placed it on August 21st.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>Can you check on my order?</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Sure — can you give me the order number and the date it was placed?</message>
+                <topic>order_lookup</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>6</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>look_up_order finds no match. Agent apologizes briefly, does not keep asking for other identifying information, and hands the caller off to a specialist right away rather than trying another way to verify them.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Order number 999999, placed January 1st.</utterance>
+        </inputs>
+        <number>7</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent does not attempt look_up_order with only the order number, since an order number alone is not enough to verify an unidentified caller. It does not keep probing for other identifiers — it apologizes and hands the caller off to a specialist.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>I don&apos;t remember the exact date it was placed, just the order number, 00000264.</utterance>
+        </inputs>
+        <number>8</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent recognizes this is a self-service request it can&apos;t fulfill (cancellation) and hands the caller off to an orders and returns specialist once it has looked up the order, rather than attempting to cancel it directly.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>I already told you my order info — I need to cancel that order, not just check on it.</utterance>
+        </inputs>
+        <number>9</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Since the caller was already identified by account, the agent leads with the pre-fetched order summary: it addresses the caller by first name and gives the order number, total, fulfillment status, and estimated delivery date in one short natural sentence — not a list of fields, and without narrating that it looked anything up. It does not call look_up_order again.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Hey, what&apos;s going on with my order?</utterance>
+            <contextVariable>
+                <variableName>AccountId</variableName>
+                <variableValue>001Sv00000gWLz2IAG</variableValue>
+            </contextVariable>
+            <contextVariable>
+                <variableName>FirstName</variableName>
+                <variableValue>Emily</variableValue>
+            </contextVariable>
+        </inputs>
+        <number>10</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>order_lookup</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent calls look_up_order with just the order number, since the caller&apos;s account is already known and a date isn&apos;t needed for an already-identified caller.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Actually that&apos;s not the one I meant — I&apos;m asking about order 00000299.</utterance>
+            <contextVariable>
+                <variableName>AccountId</variableName>
+                <variableValue>001Sv00000gWLz2IAG</variableValue>
+            </contextVariable>
+            <contextVariable>
+                <variableName>FirstName</variableName>
+                <variableValue>Emily</variableValue>
+            </contextVariable>
+            <conversationHistory>
+                <role>user</role>
+                <message>What&apos;s going on with my order?</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Hey Emily — order 00000301 for $954 is on its way. Is that the one you meant?</message>
+                <topic>order_lookup</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>11</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent calls search_company_faq, then gives the headline return/exchange policy answer in one or two sentences grounded only in retrieved content, offering more detail only if asked.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What&apos;s your return and exchange policy?</utterance>
+        </inputs>
+        <number>12</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent searches company FAQ content and answers shipping/delivery timing grounded in the retrieved excerpts.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How long does shipping usually take?</utterance>
+        </inputs>
+        <number>13</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent treats this as a general policy question (not a specific existing order) and answers from company FAQ content about cancellation/change policy.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Can I still cancel or change an order after I&apos;ve placed it?</utterance>
+        </inputs>
+        <number>14</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent answers the warranty policy question grounded in retrieved company FAQ content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What&apos;s your warranty on tents?</utterance>
+        </inputs>
+        <number>15</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent answers about the price match guarantee grounded in retrieved company FAQ content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Do you guys price match?</utterance>
+        </inputs>
+        <number>16</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent explains the Cairn Rewards program headline first, grounded in retrieved company FAQ content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How does Cairn Rewards work?</utterance>
+        </inputs>
+        <number>17</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent answers store hours/locations grounded in retrieved company FAQ content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What are your store hours, and where&apos;s your nearest location?</utterance>
+        </inputs>
+        <number>18</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent treats &apos;how to reach a person&apos; as a company FAQ topic and answers or offers to connect the caller, grounded in retrieved content rather than guessing.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Can I just talk to a real person?</utterance>
+        </inputs>
+        <number>19</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>company_faq</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_company_faq&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>search_company_faq finds nothing relevant. Agent does not fall back to general knowledge or guess — it says it doesn&apos;t have that information and hands the caller off to a specialist.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Do you sell scuba diving equipment?</utterance>
+        </inputs>
+        <number>20</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent searches product content and gives the headline spec answer grounded in the retrieved excerpts, citing the specific spec rather than a generic response.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How many people does the Ridgeline 3 tent sleep?</utterance>
+        </inputs>
+        <number>21</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent answers the compatibility question grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Is your 65-liter pack compatible with a hydration bladder?</utterance>
+        </inputs>
+        <number>22</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent gives a troubleshooting step grounded in retrieved product content, citing the specific step rather than a generic response.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>My camp stove won&apos;t light — what should I check?</utterance>
+        </inputs>
+        <number>23</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent gives a how-to answer grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How do I clean the water filter cartridge?</utterance>
+        </inputs>
+        <number>24</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent gives the specific temperature rating grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What temperature rating is the Summit 20 sleeping bag?</utterance>
+        </inputs>
+        <number>25</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent gives the specific spec grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How many lumens does your headlamp put out on the high setting?</utterance>
+        </inputs>
+        <number>26</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent answers grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Are your hiking boots waterproof?</utterance>
+        </inputs>
+        <number>27</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent gives the specific weight rating grounded in retrieved product content.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>How much weight can your camp chair hold?</utterance>
+        </inputs>
+        <number>28</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>product_qa</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;search_product_content&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>search_product_content finds nothing relevant. Agent does not guess or use general knowledge — it says it doesn&apos;t have that specific information and hands the caller off to a specialist.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Does your gear work in zero-gravity conditions on the space station?</utterance>
+        </inputs>
+        <number>29</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>escalate_to_agent</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;transfer_to_specialist&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent tells the caller in one short sentence it&apos;s connecting them with an orders and returns specialist, then transfers the call. Transfer is the default action.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Yes, please connect me.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>I need to change the shipping address on an order that&apos;s already placed.</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>I can&apos;t change an address on a placed order myself — I can get you to someone who can. Want me to connect you now?</message>
+                <topic>order_lookup</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>30</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>create_case</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Since the live transfer didn&apos;t connect the caller with a specialist, the agent lets the caller know and moves to logging a case instead of leaving them hanging.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Okay, go ahead and log it as a case then.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>I need to change the shipping address on an order that&apos;s already placed.</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>I can&apos;t change an address on a placed order myself — let me connect you with a specialist.</message>
+                <topic>order_lookup</topic>
+                <index>1</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>user</role>
+                <message>Sure.</message>
+                <index>2</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Sorry, no one&apos;s available to take the call right now. I can log this as a case for you instead — want me to do that?</message>
+                <topic>escalate_to_agent</topic>
+                <index>3</index>
+            </conversationHistory>
+        </inputs>
+        <number>31</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>create_case</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;capture_issue_summary&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent captures a short summary of the issue and reads it back in one sentence to confirm before doing anything else, rather than immediately creating the case.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>My name is Jamie Carter. Basically I need the shipping address changed on order 00000246 before it ships, and nobody&apos;s been able to help me change it.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>Okay, go ahead and log it as a case then.</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Got it — what&apos;s going on, in a sentence or two?</message>
+                <topic>create_case</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>32</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>create_case</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[&apos;log_case&apos;]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>With the issue summary confirmed and the caller&apos;s name known, the agent creates the case and reads the case number back to the caller in one short sentence.</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Yep, that&apos;s right — go ahead.</utterance>
+            <conversationHistory>
+                <role>user</role>
+                <message>My name is Jamie Carter. I need the shipping address changed on order 00000246 before it ships, and nobody&apos;s been able to help me change it.</message>
+                <index>0</index>
+            </conversationHistory>
+            <conversationHistory>
+                <role>agent</role>
+                <message>Just to confirm — you need the shipping address changed on order 00000246 before it ships, is that right?</message>
+                <topic>create_case</topic>
+                <index>1</index>
+            </conversationHistory>
+        </inputs>
+        <number>33</number>
+    </testCase>
+</AiEvaluationDefinition>
