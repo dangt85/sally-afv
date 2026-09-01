@@ -1,7 +1,6 @@
 // Data Cloud's ContentVersion data stream only ingests file versions
-// created or updated *after* the stream was created (SETUP_GUIDE.md #10 /
-// docs/superpowers/specs/2026-08-29-product-qa-vector-search-design.md
-// S1). Every product manual here was loaded before that stream existed, so
+// created or updated *after* the stream was created (SETUP_GUIDE.md #10,
+// #6.3). Every product manual here was loaded before that stream existed, so
 // the initial ingestion picked up 0 records. Re-saving each ContentVersion
 // with a real Description (previously blank) makes the incremental stream
 // see them as updated, without altering the PDF content itself.
