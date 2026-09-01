@@ -77,16 +77,6 @@ language:
     additional_locales: ""
     all_additional_locales: False
 
-# Wires company_faq's AnswerQuestionsWithKnowledge action to the Cairn_Knowledge
-# Agentforce Data Library. rag_feature_config_id is "ARFPC_" + the Data Library's
-# id (sf agent adl list --target-org sally-prep -> Cairn_Knowledge -> libraryId
-# 1JDSv000001tgR3OAI) — this agent's Data section had no way to assign the ADL via
-# the UI, so this block is the code-level equivalent of that assignment.
-knowledge:
-    rag_feature_config_id: "ARFPC_1JDSv000001tgR3OAI"
-    citations_enabled: True
-    citations_url: ""
-
 modality voice:
     voice_id: "UgBBYS2sOqTuMpoF3BR0"
     outbound_speed: 1.15
@@ -240,82 +230,40 @@ subagent company_faq:
             and programs (returns and exchanges, shipping and delivery,
             order cancellation and changes, warranty, price match guarantee,
             Cairn Rewards, store locations and hours, and how to reach a
-            person) by first calling AnswerQuestionsWithKnowledge with their
-            question, as close to verbatim as reasonable.
+            person) by first calling search_company_faq with their question,
+            as close to verbatim as reasonable.
             Say something short while it runs, since it isn't instant.
-            Ground your answer only in knowledgeSummary's content — put it
-            in your own words, spoken naturally, and never read out raw
-            citation markup, links, or formatting. Give the headline answer
-            first, in one or two sentences, and offer to go deeper only if
-            the caller wants more detail.
-            If knowledgeSummary comes back empty, or doesn't actually answer
-            the caller's question, don't fall back to general knowledge or
-            guess — say you don't have that information and hand the caller
-            off to a specialist instead.
+            If it finds relevant content, ground your answer only in what it
+            returned — put it in your own words, spoken naturally. Give the
+            headline answer first, in one or two sentences, and offer to go
+            deeper only if the caller wants more detail.
+            If it finds nothing relevant, don't fall back to general
+            knowledge or guess — say you don't have that information and
+            hand the caller off to a specialist instead.
             Never state a policy detail you haven't actually gotten from
-            AnswerQuestionsWithKnowledge.
+            search_company_faq.
         actions:
             hand_off_to_specialist: @utils.transition to @subagent.escalate_to_agent
                 description: "Connect the caller with a specialist when their question is outside company FAQ topics."
-            AnswerQuestionsWithKnowledge: @actions.AnswerQuestionsWithKnowledge
-                with query = ...
-                with citationsUrl = ...
-                with ragFeatureConfigId = ...
-                with citationsEnabled = ...
-
+            search_company_faq: @actions.company_faq_action
+                description: "Search the company FAQ/Knowledge content for excerpts relevant to the caller's policy question. Returns whether anything relevant was found and, if so, the retrieved excerpts to ground the answer in."
+                with SearchQueryInput = ...
 
     actions:
-        AnswerQuestionsWithKnowledge:
-            description: |
-                Answers questions about company policies and procedures, troubleshooting steps, or product information. For example: “What is your return policy?” “How do I fix an issue?” or “What features does a product have?”
-            label: "Answer Questions with Knowledge"
-            require_user_confirmation: False
-            include_in_progress_indicator: True
-            progress_indicator_message: "Getting answers"
-            source: "EmployeeCopilot__AnswerQuestionsWithKnowledge"
-            target: "standardInvocableAction://streamKnowledgeSearch"
-                        
+        company_faq_action:
+            description: "Search the company FAQ/Knowledge content for excerpts relevant to the caller's policy question. Returns whether anything relevant was found and, if so, the retrieved excerpts to ground the answer in."
+            target: "apex://CompanyFAQVectorSearch"
             inputs:
-                "query": string
-                    description: |
-                      Required. A string created by generative AI to be used in the knowledge article search.
-                    label: "Query"
+                SearchQueryInput: string
+                    description: "The caller's policy question, as close to verbatim as reasonable."
                     is_required: True
-                    is_user_input: True
-                "citationsUrl": string=@knowledge.citations_url
-                    description: |
-                      The URL to use for citations for custom Agents.
-                    label: "Citations Url"
-                    is_required: False
-                    is_user_input: True
-                "ragFeatureConfigId": string=@knowledge.rag_feature_config_id
-                    description: |
-                      The RAG Feature ID to use for grounding this copilot action invocation.
-                    label: "RAG Feature Configuration Id"
-                    is_required: False
-                    is_user_input: True
-                "citationsEnabled": boolean=@knowledge.citations_enabled
-                    description: |
-                      Whether or not citations are enabled.
-                    label: "Citations Enabled"
-                    is_required: False
-                    is_user_input: True
-                        
             outputs:
-                "knowledgeSummary": object
-                    description: |
-                      A string formatted as rich text that includes a summary of the information retrieved from the knowledge articles and citations to those articles.
-                    label: "Knowledge Summary"
+                ContentFound: boolean
+                    description: "Whether any relevant content was found."
                     is_displayable: True
-                    filter_from_agent: False
-                    complex_data_type_name: "lightning__richTextType"
-                "citationSources": object
-                    description: |
-                      Source links for the chunks in the hydrated prompt that's used by the planner service.
-                    label: "Citation Sources"
-                    is_displayable: False
-                    filter_from_agent: False
-                    complex_data_type_name: "@apexClassType/AiCopilot__GenAiCitationInput"
+                RetrievedContextOutput: string
+                    description: "Retrieved excerpts from company FAQ/Knowledge content relevant to the question."
+                    is_displayable: True
 
 subagent product_qa:
     label: "Product Q&A"
@@ -350,7 +298,7 @@ subagent product_qa:
     actions:
         product_qa_action:
             description: "Search the product manuals/guides for content relevant to the caller's question. Returns whether anything relevant was found and, if so, the retrieved excerpts to ground the answer in."
-            target: "apex://ProductQnAVectorSearch"
+            target: "apex://ProductQnAHybridSearch"
             inputs:
                 SearchQueryInput: string
                     description: "The caller's product question, as close to verbatim as reasonable."

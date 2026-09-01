@@ -347,15 +347,46 @@ sally-prep` catches this — fix by putting the value back on one line.
 one or more fields used by the assigned data library.` — a different
      error from the missing-assignment one above, easy to conflate if you
      only read the first line.
-2. **Custom Apex vector-search retriever** — replace the standard
-   "Answer Questions with Knowledge" action with a custom Apex action that
-   queries Data Cloud's vector search index directly over the Knowledge
-   article content, skipping the standard action's orchestration overhead.
-   Demo this as a before/after latency comparison against stage 1.
+2. **Custom Apex vector-search retriever** (`CompanyFAQVectorSearch.cls`) —
+   replaces the standard "Answer Questions with Knowledge" action with a
+   custom Apex action that queries Data Cloud's vector search index directly
+   over the Knowledge article content, skipping the standard action's
+   orchestration overhead. Demo this as a before/after latency comparison
+   against stage 1 (rehearse/record stage 1 before swapping, per the
+   commit history — the two don't run side by side in the live agent).
+   Plain `vector_search()`, not `hybrid_search()` — unlike Product Q&A
+   (§6.3), FAQ questions don't hinge on exact troubleshooting phrases.
+
+   No separate ingestion step was needed: `Knowledge__kav` was already
+   flowing into Data Cloud as `ssot__KnowledgeArticleVersion__dlm` before
+   this stage was built (confirmed live via `ConnectApi.CdpQuery` — its
+   content fields are `FAQ_Question_c__c`/`FAQ_Answer_c__c`/
+   `Chat_Answer_c__c`, its title is `ssot__Name__c`, primary key
+   `ssot__Id__c`). The Vector Search index is named `Cairn_Knowledge`
+   (`Cairn_Knowledge_index__dlm`/`_chunk__dlm`, matching the same naming
+   convention as `Compass_Product_QnA` in §6.3), built over that DLM with
+   `FAQ_Question_c__c`/`FAQ_Answer_c__c`/`Chat_Answer_c__c` as content
+   fields and `ssot__Name__c`/`ssot__ArticleNumber__c` as identifying
+   fields.
+
+   **`vector_search()`'s signature, confirmed live**:
+   `vector_search(table(<index>), '<query>', '', <top_k>)` — the empty
+   string is a required positional argument (unlike `hybrid_search()`'s
+   trailing JSON options argument, unconfirmed what it's for); passing
+   `top_k` in its place fails with an argument-type mismatch. The score
+   column on the result is `score__c`. The three-table join (index →
+   `_chunk__dlm` → `ssot__KnowledgeArticleVersion__dlm`) was confirmed live
+   to compile and run clean while the index was still empty — the SQL shape
+   is right, but the join keys (`SourceRecordId__c`/
+   `SecondarySourceRecordId__c`, same pattern as §6.3) still need
+   re-confirming against real rows once the index finishes populating,
+   since this index has only one source object (Knowledge) rather than
+   Product Q&A's two — the "`SourceRecordId__c` is a useless constant"
+   gotcha from §6.3 may not actually apply here.
 
 ### 6.3 Product Q&A
 
-A custom Apex action (`ProductQnAVectorSearch`) queries a Data Cloud **hybrid**
+A custom Apex action (`ProductQnAHybridSearch`) queries a Data Cloud **hybrid**
 search index directly over the product manual/guide `ContentVersion` files linked to
 each `Product2` record — no data graph, no Prompt Template retriever, single
 approach. Build in two parts:
@@ -377,7 +408,7 @@ approach. Build in two parts:
 
 2. **Build a Hybrid search index** over the ingested `ssot__ContentDocumentVersion__dlm`
    DMO — Data Cloud → Search Index → New. **Name it exactly `Compass_Product_QnA`** —
-   `ProductQnAVectorSearch.cls`'s `INDEX_TABLE`/`CHUNK_TABLE` constants
+   `ProductQnAHybridSearch.cls`'s `INDEX_TABLE`/`CHUNK_TABLE` constants
    (`Compass_Product_QnA_index__dlm`/`Compass_Product_QnA_chunk__dlm`) are derived
    from this name and are hardcoded, not configurable; a different name here means
    those DLMs won't exist under the names the class queries. The failure is silent
@@ -401,7 +432,7 @@ approach. Build in two parts:
    only through the CDP query API's ANSI SQL, which is exactly why `queryAnsiSqlV2`/
    `querySql` exists as a separate code path from ordinary Apex SOQL.
 
-**Apex** (`ProductQnAVectorSearch.cls`) queries the index via the async
+**Apex** (`ProductQnAHybridSearch.cls`) queries the index via the async
 `ConnectApi.CdpQuery.querySql`/`querySqlStatus`/`querySqlRows`/`cancelQuerySql` API
 (not `queryAnsiSqlV2`) specifically for its timeout/cancel handling, so a slow query
 can't leave a live voice call hanging. Confirmed shapes and gotchas, empirically

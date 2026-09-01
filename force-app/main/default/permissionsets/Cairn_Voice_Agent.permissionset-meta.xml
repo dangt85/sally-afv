@@ -2,13 +2,17 @@
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Cairn Voice Agent</label>
     <description
-  >Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — order lookup (Apex + Data Cloud data graph), product Q&amp;A (Apex vector search), company FAQ (Knowledge via Answer Questions with Knowledge), and case creation.</description>
+  >Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — order lookup (Apex + Data Cloud data graph), product Q&amp;A (Apex vector search), company FAQ (Apex vector search), and case creation.</description>
     <classAccesses>
         <apexClass>OrderLookupDataGraph</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>ProductQnAVectorSearch</apexClass>
+        <apexClass>ProductQnAHybridSearch</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>CompanyFAQVectorSearch</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <flowAccesses>
@@ -25,18 +29,6 @@
     </fieldPermissions>
     <fieldPermissions>
         <field>Order.Estimated_Delivery_Date__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Knowledge__kav.FAQ_Question__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Knowledge__kav.FAQ_Answer__c</field>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>Knowledge__kav.Chat_Answer__c</field>
         <readable>true</readable>
     </fieldPermissions>
     <objectPermissions>
@@ -70,15 +62,6 @@
         <object>Case</object>
         <allowRead>true</allowRead>
         <allowCreate>true</allowCreate>
-        <allowEdit>false</allowEdit>
-        <allowDelete>false</allowDelete>
-        <viewAllRecords>false</viewAllRecords>
-        <modifyAllRecords>false</modifyAllRecords>
-    </objectPermissions>
-    <objectPermissions>
-        <object>Knowledge__kav</object>
-        <allowRead>true</allowRead>
-        <allowCreate>false</allowCreate>
         <allowEdit>false</allowEdit>
         <allowDelete>false</allowDelete>
         <viewAllRecords>false</viewAllRecords>

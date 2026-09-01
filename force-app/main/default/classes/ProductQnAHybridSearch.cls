@@ -3,14 +3,8 @@
  * over product manual content. See SETUP_GUIDE.md §6.3 — queried via the
  * async querySql API (not queryAnsiSqlV2) so a slow/stuck query can be
  * bounded and cancelled rather than leaving a live call hanging.
- *
- * Naming note: this class predates a mid-build design correction from a
- * pure vector-search index to a hybrid one (see SETUP_GUIDE.md §6.3) — it
- * queries hybrid_search(), not vector_search(), despite the class name.
- * Not renamed since that would ripple through the permission set, the
- * .agent file, and this doc for no functional gain.
  */
-public with sharing class ProductQnAVectorSearch {
+public with sharing class ProductQnAHybridSearch {
   // Search index and its chunk DMO. The join is on the index row's
   // SourceRecordId__c (a pointer back to the source chunk) matching the
   // chunk table's own RecordId__c — NOT index.RecordId__c, which is the
