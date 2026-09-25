@@ -126,12 +126,21 @@ start_agent agent_router:
             after being asked for it — that's a continuation, not a new
             request: route back to that same topic so it can actually use
             what they gave you.
+            If the caller already agreed to log a case and you're mid-way
+            through collecting their details, route continuations there with
+            go_to_create_case — even if their answer happens to mention an
+            order number, a product, or anything else that would normally
+            sound like a different topic. They're describing their issue,
+            not asking a new question.
 
         actions:
             go_to_order_lookup: @utils.transition to @subagent.order_lookup
                 description: "Caller is asking about an existing order's status, a return, or a cancellation."
             go_to_company_faq: @utils.transition to @subagent.company_faq
                 description: "Caller is asking a company policy or general company question."
+            go_to_create_case: @utils.transition to @subagent.create_case
+                description: "Caller is continuing an already-started case-logging conversation — giving their name, a phone number or email, or restating their issue after create_case already asked for it. NOT for a caller's first request to log a case or talk to someone — those go through order lookup, company FAQ, or product Q&A first."
+                available when @variables.human_agent_available == False
             go_to_product_qa: @utils.transition to @subagent.product_qa
                 description: "Caller is asking a product question — specs, compatibility, troubleshooting, or how-to."
             go_to_off_topic: @utils.transition to @subagent.off_topic
@@ -298,14 +307,28 @@ subagent product_qa:
 
     reasoning:
         instructions: |
-            Answer the caller's product question by first calling
+            Cairn's catalog only covers tents, packs, stoves, filters,
+            sleeping bags, headlamps, boots, and camp furniture. If the
+            caller is clearly asking about something outside those
+            categories — scuba gear, climbing rope, bikes, anything Cairn
+            obviously doesn't sell — don't call search_product_content at
+            all. Say Cairn doesn't carry that and hand the caller off to a
+            specialist right away.
+            Otherwise, answer the caller's product question by first calling
             search_product_content with their question, as close to
             verbatim as reasonable.
             Say something short while it runs, since it isn't instant.
-            If it finds relevant content, ground your answer only in what
-            it returned — cite the specific spec or troubleshooting step
-            rather than a generic response. Give the headline answer first,
-            then offer more detail only if asked.
+            search_product_content always returns its closest semantic
+            match, even for questions it has no good answer to — getting a
+            result back does NOT mean it's actually relevant. Before using
+            what it returns, check that the retrieved excerpts are actually
+            about the product or category the caller asked about. If they
+            describe a different product, or don't actually address the
+            question, treat that the same as finding nothing.
+            If it finds genuinely relevant content, ground your answer only
+            in what it returned — cite the specific spec or troubleshooting
+            step rather than a generic response. Give the headline answer
+            first, then offer more detail only if asked.
             If it finds nothing relevant, don't fall back to general
             knowledge or guess — say you don't have that specific
             information and hand the caller off to a specialist instead.

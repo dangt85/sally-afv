@@ -118,7 +118,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <expectedValue>[&apos;order_lookup_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -146,16 +146,17 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>order_lookup</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <expectedValue
+      >[&apos;order_lookup_action&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >look_up_order finds no match. Agent apologizes briefly, does not keep asking for other identifying information, and hands the caller off to a specialist right away rather than trying another way to verify them.</expectedValue>
+      >look_up_order finds no match. Agent apologizes briefly, does not keep asking for other identifying information, and hands the caller off to a specialist right away rather than trying another way to verify them. The hand-off completes with a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -165,16 +166,16 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>order_lookup</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[]</expectedValue>
+            <expectedValue>[&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent does not attempt look_up_order with only the order number, since an order number alone is not enough to verify an unidentified caller. It does not keep probing for other identifiers — it apologizes and hands the caller off to a specialist.</expectedValue>
+      >Agent does not attempt look_up_order with only the order number, since an order number alone is not enough to verify an unidentified caller. It does not keep probing for other identifiers — it apologizes and hands the caller off to a specialist, completing a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -185,16 +186,17 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>order_lookup</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[]</expectedValue>
+            <expectedValue
+      >[&apos;order_lookup_action&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent recognizes this is a self-service request it can&apos;t fulfill (cancellation) and hands the caller off to an orders and returns specialist once it has looked up the order, rather than attempting to cancel it directly.</expectedValue>
+      >Agent recognizes this is a self-service request it can&apos;t fulfill (cancellation) and hands the caller off to an orders and returns specialist once it has looked up the order, rather than attempting to cancel it directly. The hand-off completes with a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -236,7 +238,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;look_up_order&apos;]</expectedValue>
+            <expectedValue>[&apos;order_lookup_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -276,7 +278,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -295,7 +297,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -314,7 +316,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -334,7 +336,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -353,7 +355,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -372,7 +374,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -391,7 +393,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_company_faq&apos;]</expectedValue>
+            <expectedValue>[&apos;company_faq_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -407,16 +409,17 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>company_faq</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[]</expectedValue>
+            <expectedValue
+      >[&apos;company_faq_action&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent treats &apos;how to reach a person&apos; as a company FAQ topic and answers or offers to connect the caller, grounded in retrieved content rather than guessing.</expectedValue>
+      >Agent treats &apos;how to reach a person&apos; as a company FAQ topic, searches company FAQ content first rather than escalating blind, and — since the retrieved &quot;How to Reach a Human Agent&quot; article itself says to transfer the caller — completes a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -426,17 +429,16 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>company_faq</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue
-      >[&apos;search_company_faq&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
+            <expectedValue>[&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >search_company_faq finds nothing relevant. Agent does not fall back to general knowledge or guess — it says it doesn&apos;t have that information and hands the caller off to a specialist.</expectedValue>
+      >Scuba gear is clearly outside Cairn&apos;s catalog (tents, packs, stoves, filters, sleeping bags, headlamps, boots, camp furniture). Agent does not call a search action at all — it says Cairn doesn&apos;t carry that and hands the caller off, completing a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -450,17 +452,17 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent searches product content and gives the headline spec answer grounded in the retrieved excerpts, citing the specific spec rather than a generic response.</expectedValue>
+      >Agent searches product content and gives the headline setup-time answer grounded in the retrieved excerpts (approximately 8-10 minutes for two people), citing the specific figure rather than a generic response.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >How many people does the Ridgeline 3 tent sleep?</utterance>
+      >How long does it take to set up the Alpine Peak 2 tent?</utterance>
         </inputs>
         <number>21</number>
     </testCase>
@@ -470,17 +472,17 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent answers the compatibility question grounded in retrieved product content.</expectedValue>
+      >Agent answers the torso-length adjustment question grounded in retrieved product content (using the internal frame ladder system).</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >Is your 65-liter pack compatible with a hydration bladder?</utterance>
+      >How do I adjust the torso length on my Summit Trail 65 pack?</utterance>
         </inputs>
         <number>22</number>
     </testCase>
@@ -490,7 +492,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -510,7 +512,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -529,17 +531,17 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent gives the specific temperature rating grounded in retrieved product content.</expectedValue>
+      >Agent gives washing instructions grounded in retrieved product content (front-loading machine, gentle cycle, down-specific cleaner, avoid top-loaders with a center agitator).</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >What temperature rating is the Summit 20 sleeping bag?</utterance>
+      >How should I wash my Frostguard 20 sleeping bag?</utterance>
         </inputs>
         <number>25</number>
     </testCase>
@@ -549,17 +551,17 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >Agent gives the specific spec grounded in retrieved product content.</expectedValue>
+      >Agent gives the specific runtime grounded in retrieved product content (up to 60 hours on low).</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
             <utterance
-      >How many lumens does your headlamp put out on the high setting?</utterance>
+      >How long does the TrailBeam 500 headlamp run on low brightness?</utterance>
         </inputs>
         <number>26</number>
     </testCase>
@@ -569,7 +571,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -588,7 +590,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;search_product_content&apos;]</expectedValue>
+            <expectedValue>[&apos;product_qa_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
@@ -603,17 +605,16 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>product_qa</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue
-      >[&apos;search_product_content&apos;,&apos;hand_off_to_specialist&apos;]</expectedValue>
+            <expectedValue>[&apos;hand_off_to_specialist&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
             <expectedValue
-      >search_product_content finds nothing relevant. Agent does not guess or use general knowledge — it says it doesn&apos;t have that specific information and hands the caller off to a specialist.</expectedValue>
+      >Zero-gravity/space station gear is clearly outside Cairn&apos;s catalog. Agent does not call a search action at all — it says it doesn&apos;t carry that and hands the caller off, completing a live transfer in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -624,7 +625,7 @@
     </testCase>
     <testCase>
         <expectation>
-            <expectedValue>escalate_to_agent</expectedValue>
+            <expectedValue>human</expectedValue>
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
@@ -633,7 +634,7 @@
         </expectation>
         <expectation>
             <expectedValue
-      >Agent tells the caller in one short sentence it&apos;s connecting them with an orders and returns specialist, then transfers the call. Transfer is the default action.</expectedValue>
+      >Agent tells the caller in one short sentence it&apos;s connecting them with an orders and returns specialist, then transfers the call. Transfer is the default action, and it completes in the same turn.</expectedValue>
             <name>bot_response_rating</name>
         </expectation>
         <inputs>
@@ -736,7 +737,7 @@
             <name>topic_sequence_match</name>
         </expectation>
         <expectation>
-            <expectedValue>[&apos;log_case&apos;]</expectedValue>
+            <expectedValue>[&apos;create_case_action&apos;]</expectedValue>
             <name>action_sequence_match</name>
         </expectation>
         <expectation>
