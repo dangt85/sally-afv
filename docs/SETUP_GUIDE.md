@@ -16,8 +16,8 @@ It's written as a run-of-show: build and rehearse everything here against
 - **Data Cloud (Data360)** provisioned in both orgs — for the order lookup data graph
   and for the vector search index backing the FAQ/Product Q&A Apex retrievers.
 - **Amazon Connect** instance connected to both orgs via **Salesforce Service Cloud
-  Voice**, with the two existing queues (`Cairn Support – English`,
-  `Cairn Support – Spanish`) already configured — this is the "current state" the
+  Voice**, with the two existing queues (`Cairn Support`,
+  `Cairn Orders & Returns`) already configured — this is the "current state" the
   demo starts from.
 - VS Code with **Salesforce Extensions** + **Agentforce DX** extension, or
   Cursor/Claude Code for the pro-code agent build.
@@ -189,6 +189,25 @@ starting split:
 Preview each topic in simulated mode in VS Code (`AFDX: Preview This Agent`) before
 wiring up real data, then switch to live mode once Apex/Flow/data are deployed.
 
+`sf agent preview` is the CLI equivalent, and it can be scripted despite being an
+interactive TUI — useful for regression-checking a topic without re-typing utterances
+by hand:
+
+```bash
+mkfifo in.fifo
+( sleep 28; printf 'what is the status of my order?'; sleep 2; printf '\r'; sleep 150 ) > in.fifo &
+script -qc 'stty cols 120 rows 45; sf agent preview --target-org sally-prep \
+  --authoring-bundle Cairn_Compass --use-live-actions \
+  --context-variables "\$Context.AccountId=001Sv00000gWLyyIAG" \
+  --output-dir ./transcripts' /dev/null < in.fifo
+```
+
+Two gotchas: linked variables need the **`$Context.` prefix** — without it they're
+treated as state variables and silently don't resolve — and `--output-dir` writes
+`transcript.jsonl` plus per-turn trace files. Read the traces, not just the
+transcript: they list which actions actually fired, which is the only way to tell a
+grounded answer from a confidently hallucinated one.
+
 ## 6. Grounding & Retrieval Build
 
 ### 6.1 Order Lookup
@@ -215,29 +234,272 @@ moving to the next.
       available in the org's Data Model canvas before mapping — Data Cloud's Standard
       Data Model can vary slightly by org/release.
    2. **Build the data graph** — build a data graph over the mapped standard objects,
-      keyed for lookup by order number and customer identifier, so a single query
-      returns the order, its line items, the customer, and the ordered products.
-   3. **Wire it up** — add the data graph as a native Data Cloud retriever action
-      directly on the `order_lookup` topic in Agent Builder (the same mechanism used
-      for `product_qa` in §6.3). No additional Apex/Flow is needed to invoke it — Data
-      Cloud resolves the query from the action's input parameters.
+      so a single query returns the order, its line items, the customer, and the
+      ordered products. Root the graph at `Account` and sort the `Sales Order` node by
+      `Order Start Date` descending (Filters tab → Sort and Limit) — that sort is what
+      makes "my most recent order" resolvable. There is no lookup-key configuration
+      screen in this builder, and only the root's primary key is queryable; see step 3.
+   3. **Wire it up** — point `order_lookup_action` at an Apex invocable action
+      (`apex://OrderLookupDataGraph`) that queries the data graph. There is **no**
+      no-code retriever action for a data graph: Setup → Retrievers only offers a
+      search-index retriever (the `product_qa`/`company_faq` mechanism in §6.3),
+      which needs a DMO with a vector search index, not a data graph. A data graph is
+      queried through the Data Graph Query API — from Apex via
+      `ConnectApi.CdpQuery.getDataGraphData(graphName, accountId, 'default')`.
+      Two things about that call are worth knowing before you write against it:
+      - Its lookup key must be the **root DMO's primary key** (here, the Account id).
+        Arbitrary nested fields like `Sales Order.OrderNumber` are not lookup keys, so
+        the Apex resolves an order number to its Account id with a plain SOQL query
+        against core `Order` first, then queries the graph by that id.
+      - **A caller the ANI didn't already identify can't resolve an order by number
+        alone** — an order number by itself is guessable and isn't proof it's really
+        their order. `order_lookup_action`'s `OrderDateInput` (the date the order was
+        placed) is required alongside `OrderNumberInput` for this path; the Apex
+        resolves the order by number, then checks `Order.EffectiveDate` against
+        `OrderDateInput` before returning anything — a mismatch, or either input
+        missing, is treated the same as no match found. The `AccountIdInput` path
+        (a caller the ANI already matched) skips this check entirely, since identity
+        is already established. `order_lookup`'s reasoning instructions escalate to a
+        human immediately if the caller can't supply both, rather than falling back to
+        another identifier, and give a deliberately minimal reply (fulfillment status
+        and estimated delivery date only — no name, no order number or total readback)
+        when a match is found this way, since the caller still isn't personally
+        identified the way an ANI match would establish.
+      - The rows in `CdpQueryOutput.data` are raw Java maps, not Apex `Map`s. Calling
+        any `Map` method on one (`get`, `keySet`, `size`, even `toString`) faults the
+        Apex interpreter in a way `try`/`catch` cannot intercept, and the failure
+        aborts the request before debug logs flush — so it looks like nothing ran.
+        `String.valueOf(row)` is safe, and renders as
+        `{json_blob__c=<the whole graph as JSON>, version__c=0}`; cut the payload out
+        of that string and `JSON.deserializeUntyped` it into real Apex collections.
+        See `OrderLookupDataGraph.parseRow`.
+      - An Apex `Decimal` output must be declared `lightning__numberType` in the
+        `.agent` file. The Flow-era `lightning__currencyType` is rejected at runtime.
+
+      **Fetch the known caller's order deterministically, not by asking the LLM to.**
+      `order_lookup`'s `before_reasoning` hook runs the action whenever `AccountId` is
+      set and stores the result in `@variables.known_order_summary`, which the
+      reasoning instructions interpolate. This is not a stylistic choice: left to
+      decide for itself, the reasoning LLM would not call an action it had no inputs
+      to fill — it either narrated "one sec, let me pull that up" and ended the turn,
+      or **fabricated** plausible order numbers and totals. Several rounds of
+      instruction wording, including an explicit "never invent an order's details",
+      did not fix it; putting the real data in the prompt before the model reasons
+      did. The Apex's `OrderSummaryOutput` exists for this hook, because Agent Script
+      mutable variables are limited to `string`/`number`/`boolean`/`object` (`date` is
+      action-parameter-only), so the five typed outputs can't each be held in one.
+
+      Two caveats worth knowing on camera: the data graph refreshes hourly, so an
+      order created mid-demo won't appear until the next refresh; and the
+      `before_reasoning` hook re-runs the graph query on every turn inside
+      `order_lookup`, which adds a round-trip per turn.
 
 ### 6.2 Company FAQ
 
-1. **Prompt Template + Data Cloud retriever** — a Prompt Template action with a
-   built-in Data Cloud/Knowledge retriever grounded on the Knowledge articles
-   published in §4.1 step 6. Baseline version of `company_faq`.
-2. **Custom Apex vector-search retriever** — replace the Prompt Template's retriever
-   call with a custom Apex action that queries Data Cloud's vector search index
-   directly over the Knowledge article content, skipping the Prompt Template
-   retriever's orchestration overhead. Demo this as a before/after latency comparison
-   against stage 1.
+1. **Agentforce Data Library (ADL) + standard "Answer Questions with Knowledge"
+   action** — built as an ADL (`Cairn_Knowledge`) over the Knowledge articles
+   published in §4.1 step 6, using Salesforce's out-of-the-box retriever/action
+   rather than a hand-built Prompt Template. Baseline version of `company_faq`.
+   - **Field selection**: content fields (what gets embedded/searched) —
+     `FAQ_Question__c`, `FAQ_Answer__c`, `Chat_Answer__c`. Include the question
+     field, not just the answer — a caller's spoken query semantically matches
+     the stored question much more closely than the answer text alone.
+     Identifying fields (metadata for citation/labeling, not embedded) —
+     `Title`, `ArticleNumber`.
+   - **Wiring gotcha, confirmed**: adding the ADL in Agent Builder generates the
+     `AnswerQuestionsWithKnowledge` action in the `.agent` file automatically,
+     but the agent's Data section may not offer a way to actually assign the
+     ADL to the agent (no add/plus control) — this looks like a UI gap for the
+     current release, not something specific to this agent. Confirmed via
+     `sf agent adl get` that the ADL can be `READY` with a real retriever and
+     still show an empty `featureAssignments` list, which produces this exact
+     runtime error when the action fires: `REQUIRED_FIELD_MISSING: We
+couldn't find a data library assigned to this agent.` The `sf agent adl`
+     command group has no flag for this assignment either.
+     **Fix**: wire it directly in Agent Script with a top-level `knowledge:`
+     block (sibling to `system:`/`language:`/`variables:`):
+     ```
+     knowledge:
+         rag_feature_config_id: "ARFPC_<the ADL's libraryId>"
+         citations_enabled: True
+         citations_url: ""
+     ```
+     The libraryId comes from `sf agent adl list --target-org sally-prep`
+     (18-char id, `1JD` prefix) — `rag_feature_config_id` is literally
+     `"ARFPC_"` prefixed onto it, not a separately-queryable record. Once this
+     block exists, the action definition's `"ragFeatureConfigId":
+string=@knowledge.rag_feature_config_id` (and the `citationsUrl`/
+     `citationsEnabled` equivalents) resolve correctly — without it, the
+     compiler rejects those same expressions with `Unknown @knowledge field`,
+     since `@knowledge.*` references this block, not a system-wide namespace.
+   - **Retrieve round-trip bug, confirmed**: pulling the bundle after an
+     Agent Builder UI save can corrupt `additional_locales: ""` into an
+     unindented, invalid two-line form (`additional_locales:` then `""` on
+     its own line at column 0), which cascades into several unrelated parse
+     errors below it. `sf agent validate authoring-bundle --target-org
+sally-prep` catches this — fix by putting the value back on one line.
+   - **Permission set gotcha, confirmed**: same category as the
+     `classAccesses` gap in §6.3 for Apex actions, but for Knowledge field
+     access — without `Knowledge__kav` object read plus field read on
+     `FAQ_Question__c`/`FAQ_Answer__c`/`Chat_Answer__c` in
+     `Cairn_Voice_Agent.permissionset-meta.xml`, the action fails with
+     `INSUFFICIENT_ACCESS_OR_READONLY: Looks like you don't have access to
+one or more fields used by the assigned data library.` — a different
+     error from the missing-assignment one above, easy to conflate if you
+     only read the first line.
+2. **Custom Apex vector-search retriever** (`CompanyFAQVectorSearch.cls`) —
+   replaces the standard "Answer Questions with Knowledge" action with a
+   custom Apex action that queries Data Cloud's vector search index directly
+   over the Knowledge article content, skipping the standard action's
+   orchestration overhead. Demo this as a before/after latency comparison
+   against stage 1 (rehearse/record stage 1 before swapping, per the
+   commit history — the two don't run side by side in the live agent).
+   Plain `vector_search()`, not `hybrid_search()` — unlike Product Q&A
+   (§6.3), FAQ questions don't hinge on exact troubleshooting phrases.
+
+   No separate ingestion step was needed: `Knowledge__kav` was already
+   flowing into Data Cloud as `ssot__KnowledgeArticleVersion__dlm` before
+   this stage was built (confirmed live via `ConnectApi.CdpQuery` — its
+   content fields are `FAQ_Question_c__c`/`FAQ_Answer_c__c`/
+   `Chat_Answer_c__c`, its title is `ssot__Name__c`, primary key
+   `ssot__Id__c`). The Vector Search index is named `Cairn_Knowledge`
+   (`Cairn_Knowledge_index__dlm`/`_chunk__dlm`, matching the same naming
+   convention as `Compass_Product_QnA` in §6.3), built over that DLM with
+   `FAQ_Question_c__c`/`FAQ_Answer_c__c`/`Chat_Answer_c__c` as content
+   fields and `ssot__Name__c`/`ssot__ArticleNumber__c` as identifying
+   fields.
+
+   **`vector_search()`'s signature, confirmed live**:
+   `vector_search(table(<index>), '<query>', '', <top_k>)` — the empty
+   string is a required positional argument (unlike `hybrid_search()`'s
+   trailing JSON options argument, unconfirmed what it's for); passing
+   `top_k` in its place fails with an argument-type mismatch. The score
+   column on the result is `score__c`. The three-table join (index →
+   `_chunk__dlm` → `ssot__KnowledgeArticleVersion__dlm`) was confirmed live
+   to compile and run clean while the index was still empty — the SQL shape
+   is right, but the join keys (`SourceRecordId__c`/
+   `SecondarySourceRecordId__c`, same pattern as §6.3) still need
+   re-confirming against real rows once the index finishes populating,
+   since this index has only one source object (Knowledge) rather than
+   Product Q&A's two — the "`SourceRecordId__c` is a useless constant"
+   gotcha from §6.3 may not actually apply here.
 
 ### 6.3 Product Q&A
 
-A custom Apex action queries Data Cloud's vector search index directly over the
-`Product2` records' linked `ContentVersion` manuals/guides — no data graph, no Prompt
-Template retriever, single approach.
+A custom Apex action (`ProductQnAHybridSearch`) queries a Data Cloud **hybrid**
+search index directly over the product manual/guide `ContentVersion` files linked to
+each `Product2` record — no data graph, no Prompt Template retriever, single
+approach. Build in two parts:
+
+1. **Ingest the manuals into Data Cloud** — Data Cloud Setup → "Ingest File
+   Attachments from Salesforce CRM Objects" (exact label may vary by release), which
+   deploys a standard Content Bundle: Data Lake Objects/Data Model Objects/Data
+   Streams for `ContentDocument`, `ContentVersion`, and `ContentDocumentLink`
+   (`ContentDocument_Home`, `ContentVersion_Home`, `ContentDocumentLink_Home` in this
+   build). Activate all three streams and give them a few minutes.
+
+   **Backfill gotcha, confirmed:** the `ContentVersion` stream only ingests versions
+   created or updated _after_ the stream exists — every manual PDF here predates it.
+   `Refresh Now` didn't backfill; the fix was a no-op re-save of each `ContentVersion`
+   (`data/scripts/touch-product-content-versions.apex`) to trigger the incremental
+   stream. `ContentDocumentLink_Home` separately needed the Data Cloud Salesforce
+   Connector permission set's "Query Non Vetted Files" + "Allow View Knowledge"
+   enabled before it would ingest without erroring.
+
+2. **Build a Hybrid search index** over the ingested `ssot__ContentDocumentVersion__dlm`
+   DMO — Data Cloud → Search Index → New. **Name it exactly `Compass_Product_QnA`** —
+   `ProductQnAHybridSearch.cls`'s `INDEX_TABLE`/`CHUNK_TABLE` constants
+   (`Compass_Product_QnA_index__dlm`/`Compass_Product_QnA_chunk__dlm`) are derived
+   from this name and are hardcoded, not configurable; a different name here means
+   those DLMs won't exist under the names the class queries. The failure is silent
+   from the caller's perspective — `querySql` throws, the class catches it and
+   returns `ContentFound=false`, and the agent just says "I don't have that" and
+   escalates, which looks like the feature doesn't work rather than a naming
+   mismatch. **Select Hybrid Search, not Vector Search**
+   (the wizard defaults to Vector selected): pure vector search under-ranks the exact
+   troubleshooting phrases these manuals hinge on ("won't ignite," "leaking seams"),
+   and a vector-only index has no keyword index to fall back to at all — querying it
+   with `hybrid_search()` fails outright with a `KEYWORD_INDEX_CONNECTION_DETAILS`
+   error, it doesn't just degrade to weaker ranking. This is easy to
+   get wrong live since the wizard doesn't warn you either way. Rebuilding the index
+   from Vector to Hybrid re-runs the entire chunk/embed/keyword-index pipeline from
+   scratch (another 15-35 minute wait on this data volume, not instant).
+
+   Building the index creates 4 additional DMOs, named `<index name>_index__dlm`,
+   `_chunk__dlm`, `_transcribe__dlm` (unused here — audio/video only), and
+   `_centr__dlm` (vector cluster centroids, not queried directly). None of these are
+   visible via standard SOQL/`describeGlobal` — they're Data Lake-backed, queryable
+   only through the CDP query API's ANSI SQL, which is exactly why `queryAnsiSqlV2`/
+   `querySql` exists as a separate code path from ordinary Apex SOQL.
+
+**Apex** (`ProductQnAHybridSearch.cls`) queries the index via the async
+`ConnectApi.CdpQuery.querySql`/`querySqlStatus`/`querySqlRows`/`cancelQuerySql` API
+(not `queryAnsiSqlV2`) specifically for its timeout/cancel handling, so a slow query
+can't leave a live voice call hanging. Confirmed shapes and gotchas, empirically
+(Salesforce's reference docs cover the REST shape, not a concrete Apex parsing
+example):
+
+- `ConnectApi.CdpQuery.querySql(QuerySqlInput)` returns `QuerySqlOutput`; the
+  `queryId` is nested at `output.status.queryId`, not a top-level field.
+  `completionStatus` (a `QuerySqlStatusEnum`) reads `ResultsProduced` immediately on
+  the submit call for most queries at this data volume — polling is the exception,
+  not the rule, but the bounded loop still matters for the case it isn't.
+- **`output.dataRows` is not reliably populated even when `completionStatus` reports
+  done** — confirmed with a one-row `COUNT(*)` that came back with `dataRows: null`
+  on the submit response, correct only via a follow-up `querySqlRows` call. Always
+  fetch rows via `querySqlRows(queryId, 0, limit)` once the query is done, whether
+  "done" arrived on the initial submit or after polling — never trust the submit
+  response's own `dataRows`.
+- `querySqlStatus(queryId)` takes a single argument — no server-side wait parameter.
+  Apex has no synchronous sleep primitive, and a spin-wait against
+  `System.currentTimeMillis()` burns real CPU-governor time rather than suspending
+  (unlike a callout), risking an uncatchable CPU-limit abort instead of graceful
+  degradation. `pollUntilDone` retries `querySqlStatus` back-to-back with no
+  artificial delay, relying on each call's own real round-trip latency for pacing.
+- `ConnectApi.QuerySqlRow` (from either `QuerySqlOutput.dataRows` or
+  `QuerySqlPageOutput.dataRows`) is a proper ConnectApi output class — its `.row`
+  field is a real `List<Object>`, safe to index directly. This is **not** the data
+  graph's raw Java/Gson-map gotcha (§6.1.3) — don't port that string-cutting
+  workaround here, it solves a problem this API doesn't have.
+- The `hybrid_search()`/`vector_search()` join is on the result's
+  `SourceRecordId__c` matching the chunk table's `RecordId__c` (the index row's own
+  `RecordId__c` is its own vector-record id, not a pointer to the chunk — easy to
+  get backwards).
+- **Labeling each excerpt with its source manual's title** requires a second join,
+  and the obvious field is a trap: the chunk table's own `SourceRecordId__c` looks
+  like it should point back to the source `ContentVersion`, but confirmed live it's
+  populated with a constant value (a User Id, apparently `CreatedById`) identical
+  across every manual-PDF chunk — useless as a join key. The real pointer is the
+  chunk table's `SecondarySourceRecordId__c`, confirmed live to equal
+  `ssot__ContentDocumentVersion__dlm.ssot__Id__c` (its primary key) and to resolve
+  to the correct, sensible title for the chunk's content. Use a `LEFT JOIN` here,
+  not an inner join — the index's declared source DMO is `ssot__Product__dlm` as
+  well as this attachment DMO, so a chunk sourced from Product2 fields directly
+  (rather than a manual PDF) has a null `SecondarySourceRecordId__c` and must not be
+  dropped just because it has no manual title.
+- Data Cloud's ANSI-SQL layer escapes a literal single quote by **doubling** it
+  (`''`), not backslash-escaping — `String.escapeSingleQuotes()` (SOQL/SOSL
+  convention) does not work here and breaks on any caller input with an apostrophe
+  ("won't," "can't") with a SQL syntax error, not a clean failure.
+- `ContentFound = true` means the query returned rows, not that they're relevant —
+  vector/hybrid search has no similarity threshold and always returns its top-K
+  nearest results. An out-of-catalog question ("how do I fix my kayak paddle") still
+  came back `ContentFound: true` with the closest semantic match (a tent's pole-repair
+  steps). The graceful "I don't have that" behavior comes from `product_qa`'s
+  reasoning instructions judging the retrieved content isn't actually relevant to the
+  question, not from the boolean flag alone — the flag and the instruction-level
+  relevance check both have to be doing their job.
+- **The Apex class needs an explicit `classAccesses` grant** in
+  `Cairn_Voice_Agent.permissionset-meta.xml` for the agent's running user, same as
+  any other `apex://` action target — missing it doesn't error, it silently withholds
+  the action from the LLM (`NO_USER_ACCESS` in the trace) and looks exactly like the
+  model just deciding to escalate instead of searching. Check the trace's
+  `EnabledToolsStep`/`runtime_withheld_actions`, not just the transcript, if an action
+  never seems to fire.
+
+No Apex test class exists for this or `OrderLookupDataGraph` (§6.1.3) — `ConnectApi`
+static methods can't be mocked with `Test.setMock`, so both are verified via live
+anonymous Apex plus `sf agent preview` traces instead of unit tests.
 
 What "good" looks like here is a clear before/after: without grounding, the agent
 gives a generic answer and asks the caller for details it should already be able to
@@ -270,7 +532,12 @@ as the "native CCaaS" story for orgs not already invested in Amazon Connect.
 - [ ] All five use cases pass manual QA in the Agentforce DX preview panel.
 - [ ] Order lookup data graph returns the correct order, line items, and
       customer/product details for at least 2–3 sample orders.
-- [ ] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
+- [ ] A caller whose ANI matched an Account gets their most recent order without
+      being asked for any identifiers, and is addressed by name.
+- [ ] Every order number/total/status/date the agent says matches core CRM exactly —
+      check the preview traces to confirm the action actually fired rather than the
+      model answering from nothing.
+- [x] Product Q&A Apex retriever returns grounded answers for at least 2–3 product
       questions per product category worth demoing.
 - [ ] Company FAQ Apex retriever returns grounded answers at lower latency than the
       Prompt Template baseline for at least 2–3 sample questions.
@@ -332,6 +599,31 @@ Repeat, from a clean sandbox, on camera:
   lookup — `Account`/`Order`/`OrderItem`/`Product2` fields are mapped to Data Cloud's
   Standard Data Model by hand (§6.1) — double-check the mapping after any Data Cloud
   org refresh/reset.
+- A Data Cloud search index built to link an unstructured DMO (e.g.
+  `ContentDocumentLink` → a structured DMO for file attachments) needs the linking
+  DLO's own primary key mapped into the target DMO too, separately from whatever
+  business-key mapping actually does the linking — "Primary key of all source DLOs
+  must be mapped to the source DMO" at Save time means exactly this, usually on a
+  DLO you didn't think of as a "real" data source (see §6.3).
+- The Search Index Builder wizard defaults to Vector Search selected, not Hybrid —
+  easy to build the wrong one without noticing, and there's no in-place edit, only a
+  full rebuild (another full chunk/embed/index cycle) to fix it (§6.3).
+- `ContentVersion`'s Data Cloud stream only ingests versions created/updated _after_
+  the stream exists — pre-existing files need a no-op re-save to backfill (§6.3, same
+  underlying behavior `SETUP_GUIDE.md` already notes for order lookup above, just a
+  file-attachment-specific instance of it).
+- Any new `apex://` action target needs an explicit `classAccesses` grant in
+  `Cairn_Voice_Agent.permissionset-meta.xml` — missing it silently withholds the
+  action from the LLM (`NO_USER_ACCESS`) rather than erroring, and looks identical to
+  the model just choosing not to call it (§6.3).
+- An Agentforce Data Library can be `READY` with a real retriever and still not be
+  assigned to any agent (Agent Builder's Data-section UI may not offer a way to do
+  this) — wire it directly with a top-level `knowledge:` block in Agent Script
+  instead (§6.2).
+- The standard "Answer Questions with Knowledge" action needs its own field-level
+  security grant (`Knowledge__kav` read + the specific content fields) in
+  `Cairn_Voice_Agent.permissionset-meta.xml`, same category as the `classAccesses`
+  gotcha above but for Knowledge fields, not Apex classes (§6.2).
 
 ## 11. References
 

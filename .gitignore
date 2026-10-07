@@ -50,3 +50,6 @@ $RECYCLE.BIN/
 # Rendered data plan records (org-specific IDs templated in at load time —
 # see data/scripts/load-data.sh)
 data/records/.generated/
+
+# Subagent-driven-development scratch workspace (ledgers, briefs, reports)
+.superpowers/
