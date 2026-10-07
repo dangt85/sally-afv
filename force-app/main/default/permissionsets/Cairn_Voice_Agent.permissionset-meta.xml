@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
     <label>Cairn Voice Agent</label>
-    <description>Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — order lookup (Flow) and case creation.</description>
+    <description>Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — order lookup (Flow), company FAQ (Apex vector search), and case creation.</description>
+    <classAccesses>
+        <apexClass>CompanyFAQVectorSearch</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <flowAccesses>
         <flow>Cairn_Order_Lookup</flow>
         <enabled>true</enabled>
