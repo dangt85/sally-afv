@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cairn Compass — voice architecture</title>
+    <style>
+      @font-face {
+        font-family: "Fredoka";
+        src: url("fonts/fredoka-600.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Fredoka";
+        src: url("fonts/fredoka-700.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Nunito";
+        src: url("fonts/nunito-800.ttf") format("truetype");
+        font-weight: 800;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Nunito";
+        src: url("fonts/nunito-900.ttf") format("truetype");
+        font-weight: 900;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Caveat";
+        src: url("fonts/caveat-600.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Caveat";
+        src: url("fonts/caveat-700.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Shantell Sans";
+        src: url("fonts/shantell-600.ttf") format("truetype");
+        font-weight: 600;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Shantell Sans";
+        src: url("fonts/shantell-700.ttf") format("truetype");
+        font-weight: 700;
+        font-style: normal;
+      }
+
+      :root {
+        --ink: #2a241c;
+        --paper: #f6f1e7;
+        --rule: #e4d8c6;
+        --num: #d0c6b6;
+        --orange: #f15a12;
+        --blue: #d4eefb;
+        --green: #d3f1c6;
+        --amber: #ffe3c2;
+        --violet: #ead9f8;
+        --pink: #ffd5ce;
+        --yellow: #fff3c4;
+        --cream: #fffdf8;
+        --muted: #5c5348;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #cfc6b8;
+      }
+
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 28px;
+        padding: 28px 0;
+      }
+
+      .poster {
+        width: 1200px;
+        background: var(--paper);
+        color: var(--ink);
+        position: relative;
+        padding: 26px 34px 18px;
+      }
+
+      .grain {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        opacity: 0.13;
+        mix-blend-mode: multiply;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: 196px 1fr 78px;
+        gap: 6px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+        min-height: 168px;
+      }
+
+      .sticky {
+        width: 176px;
+        background: #ffe15c;
+        transform: rotate(-6.5deg);
+        padding: 20px 12px 12px;
+        box-shadow: 3px 4px 0 rgba(42, 36, 28, 0.06);
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 20px;
+        line-height: 1.02;
+        position: relative;
+      }
+
+      .pin {
+        position: absolute;
+        top: -8px;
+        left: 50%;
+        width: 16px;
+        height: 16px;
+        margin-left: -8px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 35%, #ff9a9a, #e02626 55%, #8d1010);
+        box-shadow: 0 2px 0 #5c1010;
+      }
+
+      .sticky b {
+        font-family: "Fredoka", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.05em;
+        display: block;
+        margin-bottom: 2px;
+      }
+
+      h1 {
+        font-family: "Fredoka", sans-serif;
+        font-weight: 700;
+        font-size: 58px;
+        line-height: 0.9;
+        letter-spacing: -0.6px;
+        margin: 0;
+      }
+
+      .accentwrap {
+        position: relative;
+        display: inline-block;
+        margin-top: 6px;
+      }
+
+      .accent {
+        font-family: "Fredoka", sans-serif;
+        font-weight: 700;
+        font-size: 32px;
+        line-height: 1;
+        color: var(--orange);
+      }
+
+      .scribble {
+        position: absolute;
+        left: -4px;
+        width: calc(100% + 12px);
+        height: 14px;
+        bottom: -8px;
+      }
+
+      .by {
+        margin-top: 12px;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 22px;
+        color: #4a4138;
+      }
+
+      .cairn {
+        width: 70px;
+        height: 78px;
+        justify-self: end;
+      }
+
+      .legend {
+        position: relative;
+        z-index: 1;
+        margin: 8px 0 0;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 21px;
+        color: #4a4138;
+      }
+
+      .legend .star {
+        color: var(--orange);
+        font-family: "Fredoka", sans-serif;
+        font-size: 18px;
+      }
+
+      .row {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 348px minmax(0, 1fr);
+        gap: 8px 14px;
+        align-items: center;
+        padding: 13px 0 12px;
+        border-top: 1.5px solid var(--rule);
+      }
+
+      .row.band {
+        background: var(--yellow);
+        margin: 0 -34px;
+        padding: 14px 34px 13px;
+        border-top: 2.5px solid var(--ink);
+        border-bottom: 2.5px solid var(--ink);
+      }
+
+      .rail {
+        display: grid;
+        grid-template-columns: 68px 66px minmax(0, 1fr);
+        column-gap: 6px;
+        align-items: center;
+      }
+
+      .num {
+        font-family: "Nunito", sans-serif;
+        font-weight: 900;
+        font-size: 46px;
+        line-height: 0.85;
+        color: var(--num);
+        letter-spacing: -1.5px;
+      }
+
+      .ico {
+        width: 62px;
+        height: 62px;
+        display: block;
+      }
+
+      h2 {
+        margin: 0;
+        font-family: "Fredoka", sans-serif;
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.02;
+        letter-spacing: 0.01em;
+        text-transform: uppercase;
+      }
+
+      h2 .star {
+        color: var(--orange);
+        font-size: 22px;
+      }
+
+      .rail p {
+        margin: 2px 0 0;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.02;
+        color: #3f382f;
+      }
+
+      .badge {
+        display: inline-block;
+        margin-top: 3px;
+        padding: 0 7px 1px;
+        border: 2px solid var(--ink);
+        border-radius: 999px;
+        background: var(--amber);
+        font-family: "Fredoka", sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .flow {
+        min-width: 0;
+      }
+
+      .line {
+        display: flex;
+        align-items: stretch;
+        gap: 6px;
+      }
+
+      .line + .line {
+        margin-top: 8px;
+      }
+
+      .arr,
+      .darr {
+        flex: 0 0 auto;
+        align-self: center;
+        display: block;
+      }
+
+      .box {
+        flex: 1 1 0;
+        min-width: 0;
+        background: var(--cream);
+        border: 2.5px solid var(--ink);
+        border-radius: 13px;
+        padding: 7px 8px 6px;
+        text-align: center;
+        box-shadow: 2px 3px 0 rgba(42, 36, 28, 0.05);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+
+      .box b {
+        font-family: "Shantell Sans", sans-serif;
+        font-weight: 700;
+        font-size: 14.5px;
+        line-height: 1.15;
+      }
+
+      .box small {
+        display: block;
+        margin-top: 1px;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 16px;
+        line-height: 1.02;
+        color: var(--muted);
+      }
+
+      .box.blue { background: var(--blue); }
+      .box.green { background: var(--green); }
+      .box.amber { background: var(--amber); }
+      .box.violet { background: var(--violet); }
+      .box.pink { background: var(--pink); }
+      .box.yellow { background: #fff1a8; }
+      .box.cream { background: var(--cream); }
+
+      .box.pill {
+        border-radius: 999px;
+        flex: 0 1 auto;
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      .qgroup {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .qgroup .box {
+        flex: 0 0 auto;
+      }
+
+      .caption {
+        margin: 6px 0 0;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 19px;
+        line-height: 1.05;
+        color: #6a4a32;
+      }
+
+      .fan-head {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+      }
+
+      .leftbit {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        padding-right: 6px;
+      }
+
+      .bubble {
+        background: var(--cream);
+        border: 2.5px solid var(--ink);
+        border-radius: 16px 16px 16px 5px;
+        padding: 5px 10px 4px;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 18px;
+        line-height: 1.02;
+        max-width: 230px;
+      }
+
+      .forksvg {
+        display: block;
+        width: 100%;
+        height: 18px;
+        margin: 1px 0 0;
+      }
+
+      .line.fallback {
+        justify-content: flex-end;
+        padding-left: 18%;
+      }
+
+      .line.fallback .box {
+        flex: 0 1 220px;
+      }
+
+      .fan-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+
+      .fan-row .box {
+        flex: none;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+      }
+
+      .card {
+        border: 2.5px solid var(--ink);
+        border-radius: 16px;
+        padding: 8px 9px 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 3px;
+        background: rgba(255, 253, 248, 0.55);
+      }
+
+      .card.order { background: #e7f5fc; }
+      .card.faq { background: #e8f8e0; }
+      .card.product { background: #fff1e2; }
+
+      .kicker {
+        margin: 0;
+        text-align: center;
+        font-family: "Fredoka", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .ask {
+        margin: 0 0 2px;
+        text-align: center;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .card .box {
+        flex: 0 0 auto;
+        box-shadow: none;
+      }
+
+      .card .darr {
+        align-self: center;
+      }
+
+      .path {
+        margin: 0;
+        text-align: center;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 15px;
+        line-height: 1;
+        color: var(--muted);
+      }
+
+      .foot {
+        margin: 3px 0 0;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 16px;
+        line-height: 1.05;
+        color: #3f382f;
+        min-height: 50px;
+      }
+
+      .miss {
+        flex: 0 0 auto;
+        align-self: center;
+        margin-right: 4px;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 18px;
+        color: var(--orange);
+        max-width: 108px;
+        line-height: 0.95;
+        text-align: right;
+      }
+
+      footer {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding-top: 8px;
+        font-family: "Caveat", cursive;
+        font-weight: 700;
+        font-size: 20px;
+        color: #4a4138;
+      }
+
+      footer .edition {
+        font-family: "Fredoka", sans-serif;
+        font-weight: 600;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg class="sprite" width="0" height="0" aria-hidden="true">
+      <symbol id="i-phone" viewBox="0 0 64 64">
+        <g transform="rotate(-28 32 32)">
+          <rect x="26" y="8" width="12" height="48" rx="6" fill="#d4eefb" stroke="#2a241c" stroke-width="2.6" />
+          <circle cx="32" cy="16" r="6.5" fill="#fffdf8" stroke="#2a241c" stroke-width="2.4" />
+          <circle cx="32" cy="48" r="6.5" fill="#fffdf8" stroke="#2a241c" stroke-width="2.4" />
+        </g>
+        <path d="M46 18c4 3 6 7 6 12" fill="none" stroke="#f15a12" stroke-width="2.4" stroke-linecap="round" />
+        <path d="M50 14c6 4 9 10 9 17" fill="none" stroke="#f15a12" stroke-width="2.4" stroke-linecap="round" />
+      </symbol>
+      <symbol id="i-cloud-phone" viewBox="0 0 64 64">
+        <path d="M14 46h30a12 12 0 0 0 1.2-24 15 15 0 0 0-29-3A10 10 0 0 0 14 46z" fill="#d4eefb" stroke="#2a241c" stroke-width="2.6" stroke-linejoin="round" />
+        <path d="M28 27c4 2.4 4 8 0 10.4" fill="none" stroke="#f15a12" stroke-width="2.5" stroke-linecap="round" />
+        <path d="M34 23c6 4 7 13 1 18" fill="none" stroke="#f15a12" stroke-width="2.5" stroke-linecap="round" />
+      </symbol>
+      <symbol id="i-cloud-home" viewBox="0 0 64 64">
+        <path d="M10 30 L32 12 L54 30" fill="#ffe3c2" stroke="#2a241c" stroke-width="2.6" stroke-linejoin="round" />
+        <rect x="16" y="28" width="32" height="24" rx="2" fill="#d4eefb" stroke="#2a241c" stroke-width="2.6" />
+        <rect x="28" y="38" width="8" height="14" fill="#fffdf8" stroke="#2a241c" stroke-width="2.2" />
+        <rect x="20" y="34" width="6" height="6" fill="#fffdf8" stroke="#2a241c" stroke-width="1.8" />
+        <rect x="38" y="34" width="6" height="6" fill="#fffdf8" stroke="#2a241c" stroke-width="1.8" />
+      </symbol>
+      <symbol id="i-who" viewBox="0 0 64 64">
+        <circle cx="28" cy="28" r="16" fill="#fffdf8" stroke="#2a241c" stroke-width="2.6" />
+        <circle cx="28" cy="24" r="5" fill="#ffe3c2" stroke="#2a241c" stroke-width="2" />
+        <path d="M19 36c2-4 6-6 9-6s7 2 9 6" fill="none" stroke="#2a241c" stroke-width="2.2" stroke-linecap="round" />
+        <path d="M40 40 L54 54" stroke="#2a241c" stroke-width="4.5" stroke-linecap="round" />
+      </symbol>
+      <symbol id="i-compass" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="22" fill="#ffe3c2" stroke="#2a241c" stroke-width="2.6" />
+        <circle cx="32" cy="32" r="3.5" fill="#2a241c" />
+        <path d="M32 12 l5 16 -5-2 -5 2 z" fill="#e23b2f" stroke="#2a241c" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M32 52 l-5-16 5 2 5-2 z" fill="#d4eefb" stroke="#2a241c" stroke-width="1.6" stroke-linejoin="round" />
+      </symbol>
+      <symbol id="i-data" viewBox="0 0 64 64">
+        <ellipse cx="32" cy="18" rx="16" ry="7" fill="#ead9f8" stroke="#2a241c" stroke-width="2.4" />
+        <path d="M16 18 v22 c0 4 7 8 16 8 s16-4 16-8 V18" fill="#f7f0fc" stroke="#2a241c" stroke-width="2.4" />
+        <path d="M16 28 c0 4 7 7 16 7 s16-3 16-7" fill="none" stroke="#2a241c" stroke-width="2.2" />
+        <path d="M48 14 l2 4 4 1 -4 2 -1 4 -2-4 -4-1 4-2 z" fill="#f15a12" stroke="#2a241c" stroke-width="1.2" stroke-linejoin="round" />
+      </symbol>
+      <symbol id="i-headset" viewBox="0 0 64 64">
+        <circle cx="32" cy="30" r="8" fill="#ffe3c2" stroke="#2a241c" stroke-width="2.4" />
+        <path d="M16 34 a16 16 0 0 1 32 0" fill="none" stroke="#2a241c" stroke-width="2.6" stroke-linecap="round" />
+        <rect x="10" y="32" width="10" height="16" rx="3" fill="#ffd5ce" stroke="#2a241c" stroke-width="2.3" />
+        <rect x="44" y="32" width="10" height="16" rx="3" fill="#ffd5ce" stroke="#2a241c" stroke-width="2.3" />
+        <path d="M22 50 v4 a10 8 0 0 0 20 0 v-4" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" />
+      </symbol>
+      <symbol id="i-cairn" viewBox="0 0 70 78">
+        <ellipse cx="35" cy="70" rx="20" ry="4" fill="#e6d3b4" />
+        <rect x="12" y="50" width="46" height="16" rx="6" fill="#e4cfae" stroke="#2a241c" stroke-width="2.4" />
+        <rect x="20" y="34" width="32" height="14" rx="5" fill="#f0e0c6" stroke="#2a241c" stroke-width="2.4" />
+        <rect x="26" y="20" width="18" height="13" rx="4" fill="#fff6e8" stroke="#2a241c" stroke-width="2.4" />
+      </symbol>
+    </svg>
+
+    <article class="poster" id="connect">
+      <svg class="grain" xmlns="http://www.w3.org/2000/svg">
+        <filter id="grain-a" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#grain-a)" />
+      </svg>
+
+      <header>
+        <div class="sticky">
+          <div class="pin"></div>
+          <b>BEFORE → AFTER</b>
+          main had the data<br />
+          and a human queue.<br /><br />
+          This branch puts<br />
+          Compass in front.
+        </div>
+        <div>
+          <h1>How Compass<br />Answers the Phone</h1>
+          <div class="accentwrap">
+            <span class="accent">with Amazon Connect</span>
+            <svg class="scribble" viewBox="0 0 320 14" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M2 9 C 40 4, 90 13, 150 8 S 250 3, 318 8" stroke="#f15a12" stroke-width="3.5" fill="none" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="by">Cairn Outdoor Co. · Agentforce Voice · Code with Sally</div>
+        </div>
+        <svg class="cairn" viewBox="0 0 70 78"><use href="#i-cairn" /></svg>
+      </header>
+      <p class="legend">
+        <span class="star">*</span> added on feature/data360-enhancement. Everything else was already the contact center, or the sample data, on main.
+      </p>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">01</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-phone" /></svg>
+          <div>
+            <h2>The call</h2>
+            <p>Three questions Cairn hears all day.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream" style="flex: 0 0 132px">
+              <b>Caller</b>
+              <small>on the phone</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="qgroup">
+              <div class="box blue"><b>Where's my order?</b></div>
+              <div class="box green"><b>What's the return policy?</b></div>
+              <div class="box amber"><b>How do I light the stove?</b></div>
+            </div>
+          </div>
+          <p class="caption">On main, a person answered every one of these.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">02</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-cloud-phone" /></svg>
+          <div>
+            <h2>Amazon Connect</h2>
+            <p>Cairn's phone system. Salesforce joins the call.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box blue">
+              <b>Amazon Connect</b>
+              <small>numbers, IVR, audio</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box blue">
+              <b>Service Cloud Voice</b>
+              <small>softphone + transcript</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>VoiceCall</b>
+              <small>the call, in Salesforce</small>
+            </div>
+          </div>
+          <p class="caption">The switch stays. Compass is inserted in front of the people who already work these queues.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">03</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-who" /></svg>
+          <div>
+            <h2>Who's calling <span class="star">*</span></h2>
+            <p>Cairn Inbound runs before Compass speaks.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream">
+              <b>Caller number</b>
+              <small>from the VoiceCall</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box amber">
+              <b>Phone lookup</b>
+              <small>PersonAccountPhoneLookup</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box green">
+              <b>Exactly one?</b>
+              <small>else stay unknown</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box blue">
+              <b>Route to Compass</b>
+              <small>Omni-Channel</small>
+            </div>
+          </div>
+          <p class="caption">One Person Account match writes Account and first name onto the VoiceCall. Zero or many, and Compass has no name yet.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">04</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-compass" /></svg>
+          <div>
+            <h2>Compass <span class="star">*</span></h2>
+            <p>The router never answers. It only picks a topic.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="fan-head">
+            <div class="leftbit">
+              <div class="bubble">Hi Maria — this is Compass with Cairn Outdoor.</div>
+              <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+                <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="box amber pill">
+              <b>Agent Router</b>
+              <small>one hand-off per turn</small>
+            </div>
+            <div></div>
+          </div>
+          <svg class="forksvg" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M50 1 V8 H16.7 V21 M50 8 V21 M50 8 H83.3 V21" fill="none" stroke="#2a241c" stroke-width="2.3" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+          </svg>
+          <div class="fan-row">
+            <div class="box blue">
+              <b>Order Lookup</b>
+              <small>status, returns</small>
+            </div>
+            <div class="box green">
+              <b>Company FAQ</b>
+              <small>policy and hours</small>
+            </div>
+            <div class="box amber">
+              <b>Product Q&amp;A</b>
+              <small>specs and how-tos</small>
+            </div>
+          </div>
+          <p class="caption">Off topic and unclear get no answer. “Talk to a person” starts in Company FAQ, not in a transfer.</p>
+        </div>
+      </section>
+
+      <section class="row band">
+        <div class="rail">
+          <div class="num">05</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-data" /></svg>
+          <div>
+            <h2>Data 360 <span class="star">*</span></h2>
+            <p>Main loaded the records. This branch is what reads them.</p>
+          </div>
+        </div>
+        <div class="cards">
+          <article class="card order">
+            <p class="kicker">Order lookup</p>
+            <p class="ask">“Where’s my order?”</p>
+            <div class="box blue">
+              <b>Apex action</b>
+              <small>OrderLookupDataGraph</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Data graph</b>
+              <small>Compass_Order_Lookup</small>
+            </div>
+            <p class="path">Account → Order → Product · hourly</p>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>CRM records</b>
+              <small>mapped by hand</small>
+            </div>
+            <p class="foot">Known caller hears number, total, status, and date. Unknown caller needs the order number and the date, then hears status and date only.</p>
+          </article>
+          <article class="card faq">
+            <p class="kicker">Company FAQ</p>
+            <p class="ask">“What’s the return policy?”</p>
+            <div class="box green">
+              <b>Apex action</b>
+              <small>CompanyFAQVectorSearch</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Vector index</b>
+              <small>Cairn_Knowledge</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>Knowledge articles</b>
+              <small>returns, shipping, warranty</small>
+            </div>
+            <p class="foot">Replaced Answer Questions with Knowledge. Compass queries the vector index directly and speaks only from what comes back.</p>
+          </article>
+          <article class="card product">
+            <p class="kicker">Product Q&amp;A</p>
+            <p class="ask">“How do I light the stove?”</p>
+            <div class="box amber">
+              <b>Apex action</b>
+              <small>ProductQnAHybridSearch</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Hybrid index</b>
+              <small>Compass_Product_QnA</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>Manual PDFs</b>
+              <small>one or more per product</small>
+            </div>
+            <p class="foot">Keyword plus vector, so a phrase like “won’t ignite” still ranks. No data graph on this path.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">06</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-headset" /></svg>
+          <div>
+            <h2>Person or case <span class="star">*</span></h2>
+            <p>Only a topic can hand the call off.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream">
+              <b>Can't answer</b>
+              <small>from a topic</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box pink">
+              <b>Escalate</b>
+              <small>says it and transfers</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box blue">
+              <b>Connect queue</b>
+              <small>Orders &amp; Returns · Customer Support</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box green">
+              <b>Human</b>
+              <small>picks up in Salesforce</small>
+            </div>
+          </div>
+          <div class="line fallback">
+            <span class="miss">if nobody is free</span>
+            <div class="box yellow">
+              <b>Create Case</b>
+              <small>Cairn_Create_Case</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream" style="flex: 0 1 220px">
+              <b>Case number</b>
+              <small>read back on the call</small>
+            </div>
+          </div>
+          <p class="caption">Order lookup transfers to Orders &amp; Returns. FAQ and product questions transfer to Customer Support. The queue is still Amazon Connect.</p>
+        </div>
+      </section>
+
+      <footer>
+        <span>cairn outdoor co.</span>
+        <span class="edition">amazon connect build · 2026</span>
+      </footer>
+    </article>
+
+    <article class="poster" id="afcc">
+      <svg class="grain" xmlns="http://www.w3.org/2000/svg">
+        <filter id="grain-b" x="0" y="0" width="100%" height="100%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#grain-b)" />
+      </svg>
+
+      <header>
+        <div class="sticky">
+          <div class="pin"></div>
+          <b>SAME COMPASS</b>
+          The agent does<br />
+          not change.<br /><br />
+          Salesforce owns<br />
+          the dial tone.
+        </div>
+        <div>
+          <h1>How Compass<br />Answers the Phone</h1>
+          <div class="accentwrap">
+            <span class="accent">with Agentforce Contact Center</span>
+            <svg class="scribble" viewBox="0 0 520 14" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M2 9 C 60 4, 140 13, 240 8 S 400 3, 516 8" stroke="#f15a12" stroke-width="3.5" fill="none" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="by">Cairn Outdoor Co. · the native-telephony alternate · Code with Sally</div>
+        </div>
+        <svg class="cairn" viewBox="0 0 70 78"><use href="#i-cairn" /></svg>
+      </header>
+      <p class="legend">
+        <span class="star">*</span> same build as the Amazon Connect version. Row 02 is the alternate phone system — not a second codebase.
+      </p>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">01</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-phone" /></svg>
+          <div>
+            <h2>The call</h2>
+            <p>Same three questions. Same customers.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream" style="flex: 0 0 132px">
+              <b>Caller</b>
+              <small>on the phone</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="qgroup">
+              <div class="box blue"><b>Where's my order?</b></div>
+              <div class="box green"><b>What's the return policy?</b></div>
+              <div class="box amber"><b>How do I light the stove?</b></div>
+            </div>
+          </div>
+          <p class="caption">What the caller asks does not change. Only who picks up the line.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">02</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-cloud-home" /></svg>
+          <div>
+            <h2>Contact Center</h2>
+            <p>Salesforce is the phone system.</p>
+            <span class="badge">alternate</span>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box amber">
+              <b>Agentforce Contact Center</b>
+              <small>native telephony</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>VoiceCall</b>
+              <small>born inside Salesforce</small>
+            </div>
+          </div>
+          <p class="caption">No Amazon Connect and no Service Cloud Voice adapter. Numbers, audio, and IVR live in Salesforce. Cairn Inbound still runs next.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">03</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-who" /></svg>
+          <div>
+            <h2>Who's calling <span class="star">*</span></h2>
+            <p>Cairn Inbound does not care who owns the dial tone.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream">
+              <b>Caller number</b>
+              <small>from the VoiceCall</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box amber">
+              <b>Phone lookup</b>
+              <small>PersonAccountPhoneLookup</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box green">
+              <b>Exactly one?</b>
+              <small>else stay unknown</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box blue">
+              <b>Route to Compass</b>
+              <small>Omni-Channel</small>
+            </div>
+          </div>
+          <p class="caption">One Person Account match writes Account and first name onto the VoiceCall. Zero or many, and Compass has no name yet.</p>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">04</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-compass" /></svg>
+          <div>
+            <h2>Compass <span class="star">*</span></h2>
+            <p>Same router. Same three topics. Same voice.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="fan-head">
+            <div class="leftbit">
+              <div class="bubble">Hi Maria — this is Compass with Cairn Outdoor.</div>
+              <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+                <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </div>
+            <div class="box amber pill">
+              <b>Agent Router</b>
+              <small>one hand-off per turn</small>
+            </div>
+            <div></div>
+          </div>
+          <svg class="forksvg" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M50 1 V8 H16.7 V21 M50 8 V21 M50 8 H83.3 V21" fill="none" stroke="#2a241c" stroke-width="2.3" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+          </svg>
+          <div class="fan-row">
+            <div class="box blue">
+              <b>Order Lookup</b>
+              <small>status, returns</small>
+            </div>
+            <div class="box green">
+              <b>Company FAQ</b>
+              <small>policy and hours</small>
+            </div>
+            <div class="box amber">
+              <b>Product Q&amp;A</b>
+              <small>specs and how-tos</small>
+            </div>
+          </div>
+          <p class="caption">The .agent file is unchanged. Off topic and unclear still get no answer.</p>
+        </div>
+      </section>
+
+      <section class="row band">
+        <div class="rail">
+          <div class="num">05</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-data" /></svg>
+          <div>
+            <h2>Data 360 <span class="star">*</span></h2>
+            <p>Grounding does not move when the phone system does.</p>
+          </div>
+        </div>
+        <div class="cards">
+          <article class="card order">
+            <p class="kicker">Order lookup</p>
+            <p class="ask">“Where’s my order?”</p>
+            <div class="box blue">
+              <b>Apex action</b>
+              <small>OrderLookupDataGraph</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Data graph</b>
+              <small>Compass_Order_Lookup</small>
+            </div>
+            <p class="path">Account → Order → Product · hourly</p>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>CRM records</b>
+              <small>mapped by hand</small>
+            </div>
+            <p class="foot">Known caller hears number, total, status, and date. Unknown caller needs the order number and the date, then hears status and date only.</p>
+          </article>
+          <article class="card faq">
+            <p class="kicker">Company FAQ</p>
+            <p class="ask">“What’s the return policy?”</p>
+            <div class="box green">
+              <b>Apex action</b>
+              <small>CompanyFAQVectorSearch</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Vector index</b>
+              <small>Cairn_Knowledge</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>Knowledge articles</b>
+              <small>returns, shipping, warranty</small>
+            </div>
+            <p class="foot">Same vector index as the Connect build. Compass still speaks only from the excerpts the search returns.</p>
+          </article>
+          <article class="card product">
+            <p class="kicker">Product Q&amp;A</p>
+            <p class="ask">“How do I light the stove?”</p>
+            <div class="box amber">
+              <b>Apex action</b>
+              <small>ProductQnAHybridSearch</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box violet">
+              <b>Hybrid index</b>
+              <small>Compass_Product_QnA</small>
+            </div>
+            <svg class="darr" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <path d="M7 1 V10 M3 7 L7 12 L11 7" fill="none" stroke="#2a241c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream">
+              <b>Manual PDFs</b>
+              <small>one or more per product</small>
+            </div>
+            <p class="foot">Keyword plus vector, so a phrase like “won’t ignite” still ranks. No data graph on this path.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="row">
+        <div class="rail">
+          <div class="num">06</div>
+          <svg class="ico" viewBox="0 0 64 64"><use href="#i-headset" /></svg>
+          <div>
+            <h2>Person or case <span class="star">*</span></h2>
+            <p>The hand-off stays inside Salesforce.</p>
+          </div>
+        </div>
+        <div class="flow">
+          <div class="line">
+            <div class="box cream">
+              <b>Can't answer</b>
+              <small>from a topic</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box pink">
+              <b>Escalate</b>
+              <small>says it and transfers</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box amber">
+              <b>Salesforce queue</b>
+              <small>Orders &amp; Returns · Customer Support</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box green">
+              <b>Human</b>
+              <small>answers in Salesforce</small>
+            </div>
+          </div>
+          <div class="line fallback">
+            <span class="miss">if nobody is free</span>
+            <div class="box yellow">
+              <b>Create Case</b>
+              <small>Cairn_Create_Case</small>
+            </div>
+            <svg class="arr" width="26" height="16" viewBox="0 0 26 16" aria-hidden="true">
+              <path d="M1 8 H20 M15 3 L22 8 L15 13" fill="none" stroke="#2a241c" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <div class="box cream" style="flex: 0 1 220px">
+              <b>Case number</b>
+              <small>read back on the call</small>
+            </div>
+          </div>
+          <p class="caption">Same two queues, owned here. The call never hops to Amazon Connect. A missed transfer still becomes a case.</p>
+        </div>
+      </section>
+
+      <footer>
+        <span>cairn outdoor co.</span>
+        <span class="edition">contact center alternate · 2026</span>
+      </footer>
+    </article>
+  </body>
+</html>
