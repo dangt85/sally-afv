@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Cairn Voice Agent</label>
+    <description>Runtime access for the Cairn Compass Agentforce Voice agent's default agent user — case creation when a live transfer doesn't connect.</description>
+    <flowAccesses>
+        <flow>Cairn_Create_Case</flow>
+        <enabled>true</enabled>
+    </flowAccesses>
+    <objectPermissions>
+        <object>Case</object>
+        <allowRead>true</allowRead>
+        <allowCreate>true</allowCreate>
+        <allowEdit>false</allowEdit>
+        <allowDelete>false</allowDelete>
+        <viewAllRecords>false</viewAllRecords>
+        <modifyAllRecords>false</modifyAllRecords>
+    </objectPermissions>
+</PermissionSet>
