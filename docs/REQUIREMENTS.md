@@ -134,16 +134,21 @@ answer directly, without needing an order or product lookup:
 - Store Locations & Hours
 - How to Reach a Human Agent
 
-Given the English/Spanish queue split, these should exist (or be demoed) in both
-languages where practical.
-
 ## 4. Agent Use Cases (Functional Requirements)
 
 The Agentforce Voice agent must support the following:
 
 1. **Order lookup** — Given identifying information from the caller, look up a
    standard `Order` and report back order number, total, status, and estimated
-   delivery date. (Grounding/retrieval approach: §5.1.)
+   delivery date. If the caller's ANI didn't resolve to exactly one Account (no
+   match, or more than one), the agent must not accept a bare order number as
+   proof — it also requires the date the order was placed, verified against the
+   record, before it will disclose anything; if the caller can't provide both or
+   they don't match, the agent escalates to a human rather than retrying with
+   other identifiers. That verified-but-unidentified path also gets a
+   deliberately minimal reply (fulfillment status and estimated delivery date
+   only, no name, no order number/total readback) rather than the personalized
+   full detail an ANI-verified caller gets. (Grounding/retrieval approach: §5.1.)
 2. **Company FAQs** — Answer frequently asked questions about Cairn Outdoor Co.
    (returns, shipping, warranty, price match, loyalty, store hours) grounded in the
    Knowledge articles above. (Grounding/retrieval approach: §5.2.)
@@ -151,8 +156,7 @@ The Agentforce Voice agent must support the following:
    troubleshooting, how-tos) grounded in the linked PDF manuals/guides, not just
    free-form generation. (Grounding/retrieval approach: §5.3.)
 4. **Escalation to a human agent** — If a question can't be answered by the agent,
-   escalate the live call to a human agent in the appropriate Amazon Connect queue
-   (English or Spanish).
+   escalate the live call to a human agent in the appropriate queue.
 5. **Case creation as a fallback** — If a question can't be answered _and_ no human
    agent is available to escalate to, create a `Case` capturing the caller's issue so
    a human can follow up later.
@@ -178,9 +182,13 @@ ships as a single approach.
    (e.g. Individual, Sales Order, Sales Order Product, Product) — deliberately **not**
    using Data Cloud's built-in Salesforce CRM connector/data kit, so the ingestion and
    mapping mechanics are visible on camera — before building the data graph on top of
-   the mapped objects. The data graph is then added as a native Data Cloud retriever
-   action directly on the `order_lookup` topic; no additional Apex/Flow is needed to
-   invoke it.
+   the mapped objects. The data graph is then queried by an Apex invocable action
+   (`OrderLookupDataGraph`) wired into the `order_lookup` topic. A data graph has **no**
+   no-code retriever action — unlike §5.2/§5.3's search-index retrievers, it is
+   reachable only through the Data Graph Query API — so this stage swaps one Apex
+   action for another, and the interesting change is where the data comes from, not
+   how the topic is wired. See `SETUP_GUIDE.md` §6.1.3 for the constraints that shape
+   the implementation.
 
 ### 5.2 Company FAQ
 
@@ -195,10 +203,13 @@ ships as a single approach.
 
 ### 5.3 Product Q&A
 
-**Custom Apex vector-search retriever** — a single approach: a custom Apex action
-queries Data Cloud's vector search index directly over the product catalog's linked
-manual/how-to content (§3.1), grounding answers in the actual PDF content rather than
-free-form generation. No data graph is used for this use case.
+**Custom Apex hybrid-search retriever** — a single approach: a custom Apex action
+queries a Data Cloud **hybrid** (keyword + vector) search index directly over the
+product catalog's linked manual/how-to content (§3.1), grounding answers in the
+actual PDF content rather than free-form generation. Hybrid, not pure vector, so
+exact troubleshooting phrases ("won't ignite," "leaking seams") aren't under-ranked
+by semantic similarity alone — see `SETUP_GUIDE.md` §6.3 for the build detail and
+the "the wizard defaults to Vector" gotcha. No data graph is used for this use case.
 
 ## 6. Voice Channel: Telephony Approach
 
@@ -208,7 +219,7 @@ the alternate is what they're evaluating next.
 - **Primary — Amazon Connect + Salesforce Voice**: matches Cairn's real current call
   center stack. The demo shows the AI service agent slotting into the existing Amazon
   Connect queues/IVR and Salesforce Service Cloud Voice, escalating into the same
-  English/Spanish queues agents already work today.
+  queues agents already work today.
 - **Alternate — Agentforce Contact Center (AFCC)**: Salesforce's native CCaaS
   offering, shown as the "what if you moved off Amazon Connect entirely" story.
 
