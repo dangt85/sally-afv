@@ -17,6 +17,82 @@ agent or case creation when the agent can't help.
   setup, data loading, agent build steps, run-of-show for the recording.
 - Repo tracked at [github.com/dangt85/sally-afv](https://github.com/dangt85/sally-afv).
 
+## Architecture
+
+Two views of the same Compass agent. Amazon Connect is the phone system in the
+build. Agentforce Contact Center is the alternate, with Salesforce as the phone
+system.
+
+### Salesforce + Amazon Connect
+
+![How Compass answers the phone with Amazon Connect](docs/diagrams/cairn-compass-connect.png)
+
+### Agentforce Contact Center
+
+![How Compass answers the phone with Agentforce Contact Center](docs/diagrams/cairn-compass-afcc.png)
+
+### Call and escalation
+
+A call reaches Compass through Amazon Connect and Service Cloud Voice. Compass
+answers when Data 360 can ground it. When it cannot, Compass escalates the live
+call into the topic's queue, and a representative picks up in Salesforce.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Caller
+    participant Connect as Amazon Connect
+    participant Voice as Service Cloud Voice
+    participant Inbound as Cairn Inbound
+    participant Compass
+    participant Data360 as Data 360
+    participant Omni as Omni-Channel
+    actor Rep as Representative
+
+    Caller->>Connect: Call Cairn
+    Connect->>Voice: Hand off the audio and caller number
+    Voice->>Inbound: Open the new VoiceCall
+    Inbound->>Inbound: Find a Person Account by phone
+
+    alt Exactly one Person Account
+        Inbound->>Voice: Save the Account and first name on the VoiceCall
+    else No match, or more than one
+        Inbound->>Inbound: Leave the caller unknown
+    end
+
+    Inbound->>Compass: Route the VoiceCall to Compass
+    Compass->>Caller: Greet the caller
+    Caller->>Compass: Ask for help
+    Compass->>Compass: Router sends the turn to one topic
+    Note over Compass: Order lookup chooses Orders and Returns. Company FAQ and product Q&A choose Customer Support.
+    Compass->>Data360: Look up the order, article, or manual
+    Data360-->>Compass: Return a grounded result, or nothing useful
+
+    alt The result answers the question
+        Compass->>Caller: Speak the answer from that result
+    else The topic cannot resolve it
+        Compass->>Caller: Say which specialist is taking the call
+        Compass->>Omni: Escalate the live call
+        Note over Compass,Omni: Telephony plays "I'm transferring you now to a Cairn representative..."
+        alt A representative is available
+            Omni->>Connect: Place the call in the topic's queue
+            Connect->>Rep: Offer the call
+            Rep->>Caller: Pick up in Salesforce
+        else Nobody is available
+            Omni-->>Compass: The transfer did not connect
+            Compass->>Caller: Confirm a short summary of the issue
+            Compass->>Compass: Create the case
+            Compass->>Caller: Read back the case number
+        end
+    end
+```
+
+The router never answers. It only sends the caller to Order Lookup, Company FAQ,
+or Product Q&A, and that topic sets the queue before it tries to help. Escalation
+is a separate hand-off: the topic tells the caller and invokes the transfer in
+the same turn. On Agentforce Contact Center the same Compass path applies, and
+the queue stays inside Salesforce instead of returning to Amazon Connect.
+
 ## Orgs
 
 Two Salesforce **sandbox** orgs, aliased as below:
