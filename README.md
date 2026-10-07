@@ -29,13 +29,13 @@ the start of that hour. The after branch is where the hour lands. The next hour'
 before branch is the same commit as this hour's after branch. `main` is the end of
 hour 5.
 
-| Hour | Before | After | What lands |
-| --- | --- | --- | --- |
-| 1 | `show/01-before-a-person-answers` | `show/01-after-a-person-answers` | Amazon Connect and Salesforce Voice. A person answers. No agent. |
-| 2 | `show/02-before-the-agent-answers` | `show/02-after-the-agent-answers` | Compass greets, then transfers to the person from hour 1. |
-| 3 | `show/03-before-wheres-my-order` | `show/03-after-wheres-my-order` | Orders. A known caller is recognized by phone. An unknown caller proves the order. The lookup is the Flow. |
-| 4 | `show/04-before-return-policy` | `show/04-after-return-policy` | The return policy, from the FAQ articles. The hour builds the prompt-template retriever on camera, then leaves the faster Apex retriever in place. |
-| 5 | `show/05-before-the-manual` | `show/05-after-the-manual` | A product question from the manual, then order lookup moves to the data graph. |
+| Hour | Before                             | After                             | What lands                                                                                                                                         |
+| ---- | ---------------------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | `show/01-before-a-person-answers`  | `show/01-after-a-person-answers`  | Amazon Connect and Salesforce Voice. A person answers. No agent.                                                                                   |
+| 2    | `show/02-before-the-agent-answers` | `show/02-after-the-agent-answers` | Compass greets, then transfers to the person from hour 1.                                                                                          |
+| 3    | `show/03-before-wheres-my-order`   | `show/03-after-wheres-my-order`   | Orders. A known caller is recognized by phone. An unknown caller proves the order. The lookup is the Flow.                                         |
+| 4    | `show/04-before-return-policy`     | `show/04-after-return-policy`     | The return policy, from the FAQ articles. The hour builds the prompt-template retriever on camera, then leaves the faster Apex retriever in place. |
+| 5    | `show/05-before-the-manual`        | `show/05-after-the-manual`        | A product question from the manual, then order lookup moves to the data graph.                                                                     |
 
 Hour 5's after branch is `main`. Agentforce Contact Center is the coda in the hour 5
 deck, not a sixth branch.

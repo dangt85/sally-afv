@@ -2,10 +2,10 @@
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>67.0</apiVersion>
     <assignments>
-        <name>Assign_Order_Found_True</name>
-        <label>Assign Order Found True</label>
+        <name>Assign_Order_Found</name>
+        <label>Assign Order Found</label>
         <locationX>176</locationX>
-        <locationY>1007</locationY>
+        <locationY>839</locationY>
         <assignmentItems>
             <assignToReference>OrderFound</assignToReference>
             <operator>Assign</operator>
@@ -13,12 +13,19 @@
                 <booleanValue>true</booleanValue>
             </value>
         </assignmentItems>
+        <assignmentItems>
+            <assignToReference>OrderSummaryOutput</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>OrderSummaryFormula</elementReference>
+            </value>
+        </assignmentItems>
     </assignments>
     <assignments>
         <name>Assign_Order_Not_Found</name>
         <label>Assign Order Not Found</label>
         <locationX>440</locationX>
-        <locationY>1007</locationY>
+        <locationY>839</locationY>
         <assignmentItems>
             <assignToReference>OrderFound</assignToReference>
             <operator>Assign</operator>
@@ -35,64 +42,71 @@
         <defaultConnector>
             <targetReference>Assign_Order_Not_Found</targetReference>
         </defaultConnector>
-        <defaultConnectorLabel>No Identifying Info</defaultConnectorLabel>
+        <defaultConnectorLabel>Not Enough To Verify</defaultConnectorLabel>
         <rules>
-            <name>Has_Order_Number</name>
+            <name>Known_Caller_Names_An_Order</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>OrderNumberInput</leftValueReference>
-                <operator>IsNull</operator>
+                <leftValueReference>HasKnownAccount</leftValueReference>
+                <operator>EqualTo</operator>
                 <rightValue>
-                    <booleanValue>false</booleanValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <conditions>
+                <leftValueReference>HasOrderNumber</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Get_Order_By_Number</targetReference>
+                <targetReference>Get_Known_Order_By_Number</targetReference>
             </connector>
-            <label>Has Order Number</label>
+            <label>Known Caller Names An Order</label>
         </rules>
         <rules>
-            <name>Has_Name_And_Contact</name>
-            <conditionLogic>1 AND (2 OR 3)</conditionLogic>
+            <name>Known_Caller</name>
+            <conditionLogic>and</conditionLogic>
             <conditions>
-                <leftValueReference>CustomerNameInput</leftValueReference>
-                <operator>IsNull</operator>
+                <leftValueReference>HasKnownAccount</leftValueReference>
+                <operator>EqualTo</operator>
                 <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <conditions>
-                <leftValueReference>CustomerPhoneInput</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <conditions>
-                <leftValueReference>CustomerEmailInput</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
+                    <booleanValue>true</booleanValue>
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference
-        >Get_Account_By_Name_And_Contact</targetReference>
+                <targetReference>Get_Latest_Order_For_Account</targetReference>
             </connector>
-            <label>Has Name And Contact</label>
+            <label>Known Caller</label>
+        </rules>
+        <rules>
+            <name>Order_Number_And_Date</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>HasOrderProof</leftValueReference>
+                <operator>EqualTo</operator>
+                <rightValue>
+                    <booleanValue>true</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Get_Order_By_Number_And_Date</targetReference>
+            </connector>
+            <label>Order Number And Date</label>
         </rules>
     </decisions>
     <decisions>
-        <name>Decision_Order_By_Number_Found</name>
-        <label>Order By Number Found?</label>
-        <locationX>50</locationX>
-        <locationY>491</locationY>
+        <name>Decision_Order_Found</name>
+        <label>Order Found?</label>
+        <locationX>176</locationX>
+        <locationY>623</locationY>
         <defaultConnector>
             <targetReference>Assign_Order_Not_Found</targetReference>
         </defaultConnector>
         <defaultConnectorLabel>Not Found</defaultConnectorLabel>
         <rules>
-            <name>Order_By_Number_Found</name>
+            <name>Order_Was_Found</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
                 <leftValueReference>OrderNumberOutput</leftValueReference>
@@ -102,62 +116,34 @@
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Assign_Order_Found_True</targetReference>
-            </connector>
-            <label>Found</label>
-        </rules>
-    </decisions>
-    <decisions>
-        <name>Decision_Account_Found</name>
-        <label>Account Found?</label>
-        <locationX>300</locationX>
-        <locationY>491</locationY>
-        <defaultConnector>
-            <targetReference>Assign_Order_Not_Found</targetReference>
-        </defaultConnector>
-        <defaultConnectorLabel>Not Found</defaultConnectorLabel>
-        <rules>
-            <name>Account_Found</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>MatchedAccountId</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Get_Order_By_Account</targetReference>
-            </connector>
-            <label>Found</label>
-        </rules>
-    </decisions>
-    <decisions>
-        <name>Decision_Order_By_Account_Found</name>
-        <label>Order By Account Found?</label>
-        <locationX>300</locationX>
-        <locationY>707</locationY>
-        <defaultConnector>
-            <targetReference>Assign_Order_Not_Found</targetReference>
-        </defaultConnector>
-        <defaultConnectorLabel>Not Found</defaultConnectorLabel>
-        <rules>
-            <name>Order_By_Account_Found</name>
-            <conditionLogic>and</conditionLogic>
-            <conditions>
-                <leftValueReference>OrderNumberOutput</leftValueReference>
-                <operator>IsNull</operator>
-                <rightValue>
-                    <booleanValue>false</booleanValue>
-                </rightValue>
-            </conditions>
-            <connector>
-                <targetReference>Assign_Order_Found_True</targetReference>
+                <targetReference>Assign_Order_Found</targetReference>
             </connector>
             <label>Found</label>
         </rules>
     </decisions>
     <environments>Default</environments>
+    <formulas>
+        <name>HasKnownAccount</name>
+        <dataType>Boolean</dataType>
+        <expression>NOT(ISBLANK({!AccountIdInput}))</expression>
+    </formulas>
+    <formulas>
+        <name>HasOrderNumber</name>
+        <dataType>Boolean</dataType>
+        <expression>NOT(ISBLANK({!OrderNumberInput}))</expression>
+    </formulas>
+    <formulas>
+        <name>HasOrderProof</name>
+        <dataType>Boolean</dataType>
+        <expression
+    >AND(NOT(ISBLANK({!OrderNumberInput})), NOT(ISBLANK({!OrderDateInput})))</expression>
+    </formulas>
+    <formulas>
+        <name>OrderSummaryFormula</name>
+        <dataType>String</dataType>
+        <expression
+    >"order " &amp; {!OrderNumberOutput} &amp; ", total $" &amp; TEXT({!TotalAmountOutput}) &amp; ", fulfillment status " &amp; BLANKVALUE({!FulfillmentStatusOutput}, "") &amp; ", estimated delivery " &amp; IF(ISBLANK({!EstimatedDeliveryDateOutput}), "", TEXT({!EstimatedDeliveryDateOutput}))</expression>
+    </formulas>
     <interviewLabel>Cairn Order Lookup {!$Flow.CurrentDateTime}</interviewLabel>
     <label>Cairn Order Lookup</label>
     <processMetadataValues>
@@ -168,16 +154,23 @@
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
     <recordLookups>
-        <name>Get_Order_By_Number</name>
-        <label>Get Order By Number</label>
+        <name>Get_Known_Order_By_Number</name>
+        <label>Get Known Order By Number</label>
         <locationX>50</locationX>
         <locationY>383</locationY>
         <assignNullValuesIfNoRecordsFound
     >true</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Decision_Order_By_Number_Found</targetReference>
+            <targetReference>Decision_Order_Found</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
+        <filters>
+            <field>AccountId</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>AccountIdInput</elementReference>
+            </value>
+        </filters>
         <filters>
             <field>OrderNumber</field>
             <operator>EqualTo</operator>
@@ -206,61 +199,21 @@
         <storeOutputAutomatically>false</storeOutputAutomatically>
     </recordLookups>
     <recordLookups>
-        <name>Get_Account_By_Name_And_Contact</name>
-        <label>Get Account By Name And Contact</label>
-        <locationX>300</locationX>
+        <name>Get_Latest_Order_For_Account</name>
+        <label>Get Latest Order For Account</label>
+        <locationX>176</locationX>
         <locationY>383</locationY>
         <assignNullValuesIfNoRecordsFound
     >true</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Decision_Account_Found</targetReference>
-        </connector>
-        <filterLogic>1 AND (2 OR 3)</filterLogic>
-        <filters>
-            <field>Name</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>CustomerNameInput</elementReference>
-            </value>
-        </filters>
-        <filters>
-            <field>Phone</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>CustomerPhoneInput</elementReference>
-            </value>
-        </filters>
-        <filters>
-            <field>PersonEmail</field>
-            <operator>EqualTo</operator>
-            <value>
-                <elementReference>CustomerEmailInput</elementReference>
-            </value>
-        </filters>
-        <getFirstRecordOnly>true</getFirstRecordOnly>
-        <object>Account</object>
-        <outputAssignments>
-            <assignToReference>MatchedAccountId</assignToReference>
-            <field>Id</field>
-        </outputAssignments>
-        <storeOutputAutomatically>false</storeOutputAutomatically>
-    </recordLookups>
-    <recordLookups>
-        <name>Get_Order_By_Account</name>
-        <label>Get Order By Account</label>
-        <locationX>300</locationX>
-        <locationY>599</locationY>
-        <assignNullValuesIfNoRecordsFound
-    >true</assignNullValuesIfNoRecordsFound>
-        <connector>
-            <targetReference>Decision_Order_By_Account_Found</targetReference>
+            <targetReference>Decision_Order_Found</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <filters>
             <field>AccountId</field>
             <operator>EqualTo</operator>
             <value>
-                <elementReference>MatchedAccountId</elementReference>
+                <elementReference>AccountIdInput</elementReference>
             </value>
         </filters>
         <getFirstRecordOnly>true</getFirstRecordOnly>
@@ -285,6 +238,51 @@
         <sortOrder>Desc</sortOrder>
         <storeOutputAutomatically>false</storeOutputAutomatically>
     </recordLookups>
+    <recordLookups>
+        <name>Get_Order_By_Number_And_Date</name>
+        <label>Get Order By Number And Date</label>
+        <locationX>302</locationX>
+        <locationY>383</locationY>
+        <assignNullValuesIfNoRecordsFound
+    >true</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Decision_Order_Found</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>OrderNumber</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>OrderNumberInput</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>EffectiveDate</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>OrderDateInput</elementReference>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>Order</object>
+        <outputAssignments>
+            <assignToReference>OrderNumberOutput</assignToReference>
+            <field>OrderNumber</field>
+        </outputAssignments>
+        <outputAssignments>
+            <assignToReference>TotalAmountOutput</assignToReference>
+            <field>TotalAmount</field>
+        </outputAssignments>
+        <outputAssignments>
+            <assignToReference>FulfillmentStatusOutput</assignToReference>
+            <field>Fulfillment_Status__c</field>
+        </outputAssignments>
+        <outputAssignments>
+            <assignToReference>EstimatedDeliveryDateOutput</assignToReference>
+            <field>Estimated_Delivery_Date__c</field>
+        </outputAssignments>
+        <storeOutputAutomatically>false</storeOutputAutomatically>
+    </recordLookups>
     <start>
         <locationX>50</locationX>
         <locationY>0</locationY>
@@ -294,6 +292,13 @@
     </start>
     <status>Active</status>
     <variables>
+        <name>AccountIdInput</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
         <name>OrderNumberInput</name>
         <dataType>String</dataType>
         <isCollection>false</isCollection>
@@ -301,31 +306,10 @@
         <isOutput>false</isOutput>
     </variables>
     <variables>
-        <name>CustomerNameInput</name>
-        <dataType>String</dataType>
+        <name>OrderDateInput</name>
+        <dataType>Date</dataType>
         <isCollection>false</isCollection>
         <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <name>CustomerPhoneInput</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <name>CustomerEmailInput</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>true</isInput>
-        <isOutput>false</isOutput>
-    </variables>
-    <variables>
-        <name>MatchedAccountId</name>
-        <dataType>String</dataType>
-        <isCollection>false</isCollection>
-        <isInput>false</isInput>
         <isOutput>false</isOutput>
     </variables>
     <variables>
@@ -360,6 +344,13 @@
     <variables>
         <name>EstimatedDeliveryDateOutput</name>
         <dataType>Date</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
+        <isOutput>true</isOutput>
+    </variables>
+    <variables>
+        <name>OrderSummaryOutput</name>
+        <dataType>String</dataType>
         <isCollection>false</isCollection>
         <isInput>false</isInput>
         <isOutput>true</isOutput>
